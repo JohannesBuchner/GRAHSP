@@ -191,8 +191,10 @@ def build_m2005(base):
             raise ValueError('Unknown IMF!!!')
 
         # Keep only the actual metallicity values in the mass table
-        # we don't take the first column which contains metallicity
-        mass_table = mass_table[1:, mass_table[0] == metallicity]
+        # we don't take the first column which contains metallicity.
+        # We also eliminate the turn-off mas which makes no send for composite
+        # populations.
+        mass_table = mass_table[1:7, mass_table[0] == metallicity]
 
         # Interpolate the mass table over the new age grid. We multiply per
         # 1000 because the time in Maraston files is given in Gyr.
@@ -223,6 +225,22 @@ def build_m2005(base):
 
             tmp_list.append(flux_regrid)
         flux_age = np.array(tmp_list)
+
+        # To avoid the creation of waves when interpolating, we refine the grid
+        # beyond 10 μm following a log scale in wavelength. The interpolation
+        # is also done in log space as the spectrum is power-law-like
+        lambda_grid_resamp = np.around(np.logspace(np.log10(10000),
+                                                   np.log10(160000), 50))
+        argmin = np.argmin(10000.-lambda_grid > 0)-1
+        flux_age_resamp = 10.**interpolate.interp1d(
+                                    np.log10(lambda_grid[argmin:]),
+                                    np.log10(flux_age[argmin:, :]),
+                                    assume_sorted=True,
+                                    axis=0)(np.log10(lambda_grid_resamp))
+
+        lambda_grid = np.hstack([lambda_grid[:argmin+1], lambda_grid_resamp])
+        flux_age = np.vstack([flux_age[:argmin+1, :], flux_age_resamp])
+
 
         # Use Z value for metallicity, not log([Z/H])
         metallicity = {-1.35: 0.001,
@@ -278,6 +296,21 @@ def build_bc2003(base):
         color_table = interpolate.interp1d(ssp_time, color_table)(time_grid)
         ssp_lumin = interpolate.interp1d(ssp_time,
                                          ssp_lumin)(time_grid)
+
+        # To avoid the creation of waves when interpolating, we refine the grid
+        # beyond 10 μm following a log scale in wavelength. The interpolation
+        # is also done in log space as the spectrum is power-law-like
+        ssp_wave_resamp = np.around(np.logspace(np.log10(10000),
+                                                np.log10(160000), 50))
+        argmin = np.argmin(10000.-ssp_wave > 0)-1
+        ssp_lumin_resamp = 10.**interpolate.interp1d(
+                                    np.log10(ssp_wave[argmin:]),
+                                    np.log10(ssp_lumin[argmin:, :]),
+                                    assume_sorted=True,
+                                    axis=0)(np.log10(ssp_wave_resamp))
+
+        ssp_wave = np.hstack([ssp_wave[:argmin+1], ssp_wave_resamp])
+        ssp_lumin = np.vstack([ssp_lumin[:argmin+1, :], ssp_lumin_resamp])
 
         base.add_bc03(BC03(
             imf,
@@ -548,7 +581,7 @@ def build_fritz2006(base):
 
             base.add_fritz2006(Fritz2006(params[4], params[3], params[2],
                                          params[1], params[0], psy[n], wave,
-                                         lumin_therm, lumin_scatt, lumin_agn))
+                                         lumin_therm, lumin_scatt,lumin_agn))
 
 
 def build_nebular(base):

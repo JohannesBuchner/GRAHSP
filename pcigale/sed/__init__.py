@@ -25,7 +25,7 @@ Such SED is characterised by:
 
 - info: a dictionary containing various information about the SED.
 
-- mass_proportional_info: the list of keys in the info dictionary whose value
+- mass_proportional_info: the set of keys in the info dictionary whose value
   is proportional to the galaxy mass.
 
 """
@@ -62,9 +62,10 @@ class SED(object):
         self.modules = []
         self.wavelength_grid = None
         self.contribution_names = []
+        self.luminosity = None
         self.luminosities = None
         self.info = OrderedDict()
-        self.mass_proportional_info = []
+        self.mass_proportional_info = set()
 
     @property
     def sfh(self):
@@ -81,50 +82,14 @@ class SED(object):
 
         if value:
             sfh_time, sfh_sfr = value
-            sfh_age = np.max(sfh_time) - sfh_time
+            sfh_age = sfh_time[-1] - sfh_time
             self._sfh = value
             self.add_info("sfr", sfh_sfr[-1], True, True)
-            self.add_info("average_sfr", np.mean(sfh_sfr[sfh_age <= AV_LAPSE]),
+            self.add_info("sfr10Myrs", np.mean(sfh_sfr[-10:]),
                           True, True)
-            self.add_info("age", np.max(sfh_time), False, True)
-
-    @property
-    def wavelength_grid(self):
-        """ Return a copy of the wavelength grid
-        """
-        if self._wavelength_grid is None:
-            return None
-        else:
-            return np.copy(self._wavelength_grid)
-
-    @wavelength_grid.setter
-    def wavelength_grid(self, value):
-        self._wavelength_grid = value
-
-    @property
-    def luminosities(self):
-        """ Return a copy of the luminosity contributions
-        """
-        if self._luminosities is None:
-            return None
-        else:
-            return np.copy(self._luminosities)
-
-    @luminosities.setter
-    def luminosities(self, value):
-        self._luminosities = value
-
-    @property
-    def luminosity(self):
-        """Total luminosity of the SED
-
-        Return the total luminosity density vector, i.e. the sum of all the
-        contributions in W/nm.
-        """
-        if self._luminosities is None:
-            return None
-        else:
-            return self._luminosities.sum(0)
+            self.add_info("sfr100Myrs", np.mean(sfh_sfr[-100:]),
+                          True, True)
+            self.add_info("age", sfh_time[-1], False, True)
 
     @property
     def fnu(self):
@@ -169,7 +134,7 @@ class SED(object):
         if (key not in self.info) or force:
             self.info[key] = value
             if mass_proportional:
-                self.mass_proportional_info.append(key)
+                self.mass_proportional_info.add(key)
         else:
             raise KeyError("The information %s is already present "
                            "in the SED. " % key)
@@ -221,9 +186,10 @@ class SED(object):
 
         # If the SED luminosity table is empty, then there is nothing to
         # compute.
-        if self.luminosities is None:
-            self.wavelength_grid = np.copy(results_wavelengths)
-            self.luminosities = np.copy(results_lumin)
+        if self.luminosity is None:
+            self.wavelength_grid = results_wavelengths.copy()
+            self.luminosity = results_lumin.copy()
+            self.luminosities = results_lumin.copy()
         else:
             # If the added luminosity contribution changes the SED wavelength
             # grid, we interpolate everything on a common wavelength grid.
@@ -249,9 +215,11 @@ class SED(object):
 
                 self.wavelength_grid = new_wavelength_grid
                 self.luminosities = np.vstack((new_luminosities, interp_lumin))
+                self.luminosity = self.luminosities.sum(0)
             else:
                 self.luminosities = np.vstack((self.luminosities,
                                                results_lumin))
+                self.luminosity += results_lumin
 
     def get_lumin_contribution(self, name):
         """Get the luminosity vector of a given contribution
@@ -370,3 +338,21 @@ class SED(object):
 
         """
         save_sed_to_vo(self, filename, mass)
+
+    def copy(self):
+        sed = SED()
+        sed.sfh = (self._sfh[0].copy(), self._sfh[1].copy())
+        sed.modules = self.modules[:]
+        if self.wavelength_grid is not None:
+            sed.wavelength_grid = self.wavelength_grid.copy()
+            sed.luminosity = self.luminosity.copy()
+            sed.luminosities = self.luminosities.copy()
+        else:
+            sed.wavelength_grid = None
+            sed.luminosity = None
+            sed.luminosities = None
+        sed.contribution_names = self.contribution_names[:]
+        sed.info = self.info.copy()
+        sed.mass_proportional_info = self.mass_proportional_info.copy()
+
+        return sed

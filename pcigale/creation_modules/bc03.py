@@ -50,8 +50,10 @@ class BC03(CreationModule):
     out_parameter_list = OrderedDict([
         ("sfr", "Instantaneous Star Formation Rate in solar mass per year, "
                 "at the age of the galaxy."),
-        ("average_sfr", "Average SFR in the last 100 Myr (default) of the "
-                        "galaxy history."),
+        ('sfr10Myrs', 'Average SFR in the last 10 Myr (default) of the '
+                        'galaxy history.'),
+        ('sfr100Myrs', 'Average SFR in the last 100 Myr (default) of the '
+                        'galaxy history.'),
         ("ssp_m_star", "Total mass in stars in Solar mass."),
         ("ssp_m_gas", "Mass returned to the ISM by evolved stars in Solar "
                       "mass."),
@@ -131,8 +133,6 @@ class BC03(CreationModule):
         sed.add_info("stellar.m_gas",
                      young_info["m_gas"] + old_info["m_gas"],
                      True)
-
-        sed.add_info("galaxy_mass", 1., True)
 
         sed.add_contribution("stellar.old", old_wave, old_lumin)
         sed.add_contribution("stellar.young", young_wave, young_lumin)

@@ -10,11 +10,11 @@ Fritz et al. (2006) AGN dust torus emission module
 This module implements the Fritz et al. (2006) models.
 
 """
-
+import numpy as np
 from collections import OrderedDict
 from pcigale.data import Database
 from . import CreationModule
-
+from pcigale.sed.cosmology import cosmology
 
 class Fritz2006(CreationModule):
     """Fritz et al. (2006) AGN dust torus emission
@@ -63,13 +63,14 @@ class Fritz2006(CreationModule):
         )),
         ('opening_angle', (
             'float',
-            "Opening angle of the dust torus. Possible values are: 20, 40, "
-            "60.",
-            40.
+            "Full opening angle of the dust torus (Fig 1 of Fritz 2006). "
+            "Possible values are: 60., 100., 140.",
+            100.
         )),
         ('psy', (
             'float',
-            "Angle between AGN axis and line of sight. Possible values are: "
+            "Angle between equatorial axis and line of sight. "
+            "Psy = 90◦ for type 1 and Psy = 0° for type 2. Possible values are: "
             "0.001, 10.100, 20.100, 30.100, 40.100, 50.100, 60.100, 70.100, "
             "80.100, 89.990.",
             50.100
@@ -83,7 +84,10 @@ class Fritz2006(CreationModule):
 
     out_parameter_list = OrderedDict([
         ('fracAGN', 'Contribution of the AGN'),
-        ('L_AGN', 'Luminosity of the AGN contribution')
+        ('agn.therm_luminosity', 'Luminosity of the AGN contribution due to the dust torus'),
+        ('agn.scatt_luminosity', 'Luminosity of the AGN contribution due to the photon scattering'),
+        ('agn.agn_luminosity', 'Luminosity of the AGN contribution due to the central source'),
+        ('agn.luminosity', 'Total luminosity of the AGN contribution')
     ])
 
     def _init_code(self):
@@ -92,7 +96,7 @@ class Fritz2006(CreationModule):
         tau = self.parameters["tau"]
         beta = self.parameters["beta"]
         gamma = self.parameters["gamma"]
-        opening_angle = self.parameters["opening_angle"]
+        opening_angle = (180. - self.parameters["opening_angle"]) / 2.
         psy = self.parameters["psy"]
 
         with Database() as base:
@@ -126,17 +130,28 @@ class Fritz2006(CreationModule):
 
         # Compute the AGN luminosity
         if fracAGN < 1.:
-            L_AGN = luminosity * (1./(1.-fracAGN) - 1.)
+            agn_power = luminosity * (1./(1.-fracAGN) - 1.)
+            l_agn_therm = agn_power
+            l_agn_scatt = np.trapz(agn_power * self.fritz2006.lumin_scatt, x=self.fritz2006.wave)
+            l_agn_agn = np.trapz(agn_power * self.fritz2006.lumin_agn, x=self.fritz2006.wave)
+            l_agn_total = l_agn_therm + l_agn_scatt + l_agn_agn
+        
+        
         else:
             raise Exception("AGN fraction is exactly 1. Behaviour "
                             "undefined.")
 
-        sed.add_contribution('agn_fritz2006_therm', self.fritz2006.wave,
-                             L_AGN * self.fritz2006.lumin_therm)
-        sed.add_contribution('agn_fritz2006_scatt', self.fritz2006.wave,
-                             L_AGN * self.fritz2006.lumin_scatt)
-        sed.add_contribution('agn_fritz2006_agn', self.fritz2006.wave,
-                             L_AGN * self.fritz2006.lumin_agn)
+        sed.add_info('agn.therm_luminosity', l_agn_therm, True)
+        sed.add_info('agn.scatt_luminosity', l_agn_scatt, True)
+        sed.add_info('agn.agn_luminosity', l_agn_agn, True)
+        sed.add_info('agn.luminosity', l_agn_total, True)
+
+        sed.add_contribution('agn.fritz2006_therm', self.fritz2006.wave,
+                             agn_power * self.fritz2006.lumin_therm)
+        sed.add_contribution('agn.fritz2006_scatt', self.fritz2006.wave,
+                             agn_power * self.fritz2006.lumin_scatt)
+        sed.add_contribution('agn.fritz2006_agn', self.fritz2006.wave,
+                             agn_power * self.fritz2006.lumin_agn)
 
 # CreationModule to be returned by get_module
 Module = Fritz2006
