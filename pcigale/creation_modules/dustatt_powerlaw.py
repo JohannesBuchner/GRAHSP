@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2013 Centre de données Astrophysiques de Marseille
+# Copyright (C) 2014 Laboratoire d'Astrophysique de Marseille
 # Licensed under the CeCILL-v2 licence - see Licence_CeCILL_V2-en.txt
-# Author: Yannick Roehlly
+# Author: Yannick Roehlly, Denis Burgarella
 
 """
 Charlot and Fall (2000) power law attenuation module
@@ -64,7 +65,7 @@ def uv_bump(wavelength, central_wave, gamma, ebump):
 def alambda_av(wavelength, delta, bump_wave, bump_width, bump_ampl):
     """Compute the complete attenuation curve A(λ)/Av
 
-    The continuum is a power law (λ / λv) ** δ to with is added a UV bump.
+    The continuum is a power law (λ / λv) ** δ to which is added a UV bump.
 
     Parameters
     ----------
@@ -97,8 +98,8 @@ def alambda_av(wavelength, delta, bump_wave, bump_width, bump_ampl):
 class PowerLawAtt(CreationModule):
     """Power law attenuation module
 
-    This module computes the Cardelli, Clayton and Mathis attenuation using
-    a power law as defined in Charlot and Fall (2000).
+    This module computes the attenuation using a power law 
+    as defined in Charlot and Fall (2000).
 
     The attenuation can be computed on the whole spectrum or on a specific
     contribution and is added to the SED as a negative contribution.
@@ -173,7 +174,7 @@ class PowerLawAtt(CreationModule):
         self.sel_attenuation = None
 
     def process(self, sed):
-        """Add the CCM dust attenuation to the SED.
+        """Add the dust attenuation to the SED.
 
         Parameters
         ----------
@@ -185,7 +186,7 @@ class PowerLawAtt(CreationModule):
         av['young'] = float(self.parameters["Av_young"])
         av['old'] = float(self.parameters["Av_old_factor"] * av['young'])
         uv_bump_wavelength = float(self.parameters["uv_bump_wavelength"])
-        uv_bump_width = float(self.parameters["uv_bump_wavelength"])
+        uv_bump_width = float(self.parameters["uv_bump_width"])
         uv_bump_amplitude = float(self.parameters["uv_bump_amplitude"])
         powerlaw_slope = float(self.parameters["powerlaw_slope"])
         filters = self.filters
@@ -202,7 +203,7 @@ class PowerLawAtt(CreationModule):
             self.sel_attenuation = alambda_av(wavelength, powerlaw_slope,
                                      uv_bump_wavelength, uv_bump_width,
                                      uv_bump_amplitude)
-
+  
         attenuation_total = 0.
         for contrib in list(sed.contribution_names):
             age = contrib.split('.')[-1].split('_')[-1]
@@ -216,10 +217,16 @@ class PowerLawAtt(CreationModule):
             attenuation_total += attenuation
 
             sed.add_module(self.name, self.parameters)
-            sed.add_info("attenuation.Av." + contrib, av[age])
-            sed.add_info("attenuation." + contrib, attenuation, True)
+            sed.add_info("attenuation.Av.stellar"+
+                         contrib[contrib.find('_'):], av[age])
+            sed.add_info("attenuation.stellar"+
+                         contrib[contrib.find('_'):], attenuation, True)
             sed.add_contribution("attenuation." + contrib, wavelength,
                                  attenuation_spectrum)
+
+        # Bump and slope of the dust attenuation
+        sed.add_info("attenuation.uv_bump_amplitude", uv_bump_amplitude)
+        sed.add_info("attenuation.powerlaw_slope", powerlaw_slope)
 
         # Total attenuation
         sed.add_info("dust.luminosity", attenuation_total, True)

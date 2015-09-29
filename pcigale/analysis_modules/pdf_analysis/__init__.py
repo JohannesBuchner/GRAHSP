@@ -35,7 +35,7 @@ import numpy as np
 
 from ...utils import read_table
 from .. import AnalysisModule, complete_obs_table
-from .utils import save_table_analysis, save_table_best
+from .utils import save_table_analysis, save_table_best, analyse_chi2
 from ...warehouse import SedWarehouse
 from ...data import Database
 from .workers import sed as worker_sed
@@ -43,6 +43,8 @@ from .workers import init_sed as init_worker_sed
 from .workers import init_analysis as init_worker_analysis
 from .workers import analysis as worker_analysis
 from ..utils import ParametersHandler, backup_dir
+
+from ..utils import OUT_DIR
 
 # Tolerance threshold under which any flux or error is considered as 0.
 TOLERANCE = 1e-12
@@ -80,6 +82,12 @@ class PdfAnalysis(AnalysisModule):
         ("lim_flag", (
             "boolean",
             "If true, for each object check whether upper limits are present "
+            "and analyse them.",
+            False
+        )),
+        ("mock_flag", (
+            "boolean",
+            "If true, for each object we create a mock object "
             "and analyse them.",
             False
         ))
@@ -124,6 +132,7 @@ class PdfAnalysis(AnalysisModule):
         save = {key: config["save_{}".format(key)].lower() == "true"
                 for key in ["best_sed", "chi2", "pdf"]}
         lim_flag = config["lim_flag"].lower() == "true"
+        mock_flag = config["mock_flag"].lower() == "true"
 
         # Get the needed filters in the pcigale database. We use an ordered
         # dictionary because we need the keys to always be returned in the
@@ -193,7 +202,7 @@ class PdfAnalysis(AnalysisModule):
                          initargs=initargs) as pool:
                 pool.map(worker_sed, range(n_params))
 
-        print('\nAnalysing models...')
+        print("\nAnalysing models...")
 
         # We use RawArrays for the same reason as previously
         analysed_averages = (RawArray(ctypes.c_double, n_obs * n_variables),
@@ -207,11 +216,12 @@ class PdfAnalysis(AnalysisModule):
         best_chi2 = (RawArray(ctypes.c_double, n_obs), (n_obs))
         best_chi2_red = (RawArray(ctypes.c_double, n_obs), (n_obs))
 
+        phase = 1
         initargs = (params, filters, analysed_variables, model_redshifts,
                     model_fluxes, model_variables, time.time(),
                     mp.Value('i', 0), analysed_averages, analysed_std,
                     best_fluxes, best_parameters, best_chi2, best_chi2_red,
-                    save, lim_flag, n_obs)
+                    save, lim_flag, n_obs, phase)
         if cores == 1:  # Do not create a new process
             init_worker_analysis(*initargs)
             for idx, obs in enumerate(obs_table):
@@ -221,11 +231,74 @@ class PdfAnalysis(AnalysisModule):
                          initargs=initargs) as pool:
                 pool.starmap(worker_analysis, enumerate(obs_table))
 
+        analyse_chi2(best_chi2_red)
+
         print("\nSaving results...")
 
-        save_table_analysis(obs_table['id'], analysed_variables,
-                            analysed_averages, analysed_std)
-        save_table_best(obs_table['id'], best_chi2, best_chi2_red,
+        save_table_analysis('analysis_results.txt', obs_table['id'], 
+                            analysed_variables, analysed_averages, analysed_std)
+        save_table_best('best_models.txt', obs_table['id'], best_chi2, 
+                     best_chi2_red, best_parameters, best_fluxes, filters, info)
+
+        if mock_flag is True:
+
+            print("\nMock analysis...")
+
+            obs_fluxes = np.array([obs_table[name] for name in filters]).T
+            obs_errors = np.array([obs_table[name + "_err"] for name in filters]).T
+            mock_fluxes = np.empty_like(obs_fluxes)
+            mock_errors = np.empty_like(obs_errors)
+            bestmod_fluxes = np.ctypeslib.as_array(best_fluxes[0])
+            bestmod_fluxes = bestmod_fluxes.reshape(best_fluxes[1])
+
+            wdata =   np.where((obs_fluxes > 0.)&(obs_errors > 0.))
+            wlim =    np.where((obs_fluxes > 0.)&
+                               (obs_errors >= -9990.)&(obs_errors < 0.))
+            wnodata = np.where((obs_fluxes <= -9990.)&(obs_errors <= -9990.))
+            
+            mock_fluxes[wdata] = np.random.normal(
+                           bestmod_fluxes[wdata], 
+                           obs_errors[wdata], 
+                           len(bestmod_fluxes[wdata]))
+            mock_errors[wdata] = obs_errors[wdata]
+                
+            mock_fluxes[wlim] = obs_fluxes[wlim]
+            mock_errors[wlim] = obs_errors[wlim]
+
+            mock_fluxes[wnodata] = obs_fluxes[wnodata]
+            mock_errors[wnodata] = obs_errors[wnodata]
+                
+            mock_table = obs_table.copy()
+            mock_table['id'] = obs_table['id']
+            mock_table['redshift'] = obs_table['redshift']
+            
+            indx = 0
+            for name in filters:
+                mock_table[name] = mock_fluxes[:, indx]
+                mock_table[name + "_err"] = mock_errors[:, indx]
+                indx += 1
+                                       
+            phase = 2
+            initargs = (params, filters, analysed_variables, model_redshifts,
+                    model_fluxes, model_variables, time.time(),
+                    mp.Value('i', 0), analysed_averages, analysed_std,
+                    best_fluxes, best_parameters, best_chi2,
+                    best_chi2_red, save, lim_flag, n_obs, phase)
+            if cores == 1:  # Do not create a new process
+                init_worker_analysis(*initargs)
+                for idx, mock in enumerate(mock_table):
+                    worker_analysis(idx, mock)
+            else:  # Analyse observations in parallel
+                with mp.Pool(processes=cores, initializer=init_worker_analysis,
+                             initargs=initargs) as pool:
+                    pool.starmap(worker_analysis, enumerate(mock_table))
+
+            print("\nSaving results...")
+
+            save_table_analysis('analysis_mock_results.txt', mock_table['id'], 
+                  analysed_variables, analysed_averages, analysed_std)
+            save_table_best('best_mock_models.txt', mock_table['id'], 
+                        best_chi2, best_chi2_red,
                         best_parameters, best_fluxes, filters, info)
 
         print("Run completed!")

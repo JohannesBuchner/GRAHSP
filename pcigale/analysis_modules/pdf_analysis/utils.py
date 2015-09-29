@@ -15,11 +15,6 @@ from ..utils import OUT_DIR
 
 # Number of points in the PDF
 PDF_NB_POINTS = 1000
-# Name of the file containing the analysis results
-RESULT_FILE = "analysis_results.txt"
-# Name of the file containing the best models information
-BEST_MODEL_FILE = "best_models.txt"
-
 
 def save_best_sed(obsid, sed, norm):
     """Save the best SED to a VO table.
@@ -95,12 +90,14 @@ def save_chi2(obsid, analysed_variables, model_variables, reduced_chi2):
         table.write(OUT_DIR + "{}_{}_chi2.fits".format(obsid, var_name))
 
 
-def save_table_analysis(obsid, analysed_variables, analysed_averages,
+def save_table_analysis(filename, obsid, analysed_variables, analysed_averages,
                         analysed_std):
     """Save the estimated values derived from the analysis of the PDF
 
     Parameters
     ----------
+    filename: name of the file to save
+        Name of the output file
     obsid: table column
         Names of the objects
     analysed_variables: list
@@ -128,15 +125,17 @@ def save_table_analysis(obsid, analysed_variables, analysed_averages,
             np_analysed_std[:, index],
             name=variable+"_err"
         ))
-    result_table.write(OUT_DIR + RESULT_FILE, format='ascii.commented_header')
+    result_table.write(OUT_DIR + filename, format='ascii.commented_header')
 
 
-def save_table_best(obsid, chi2, chi2_red, variables, fluxes, filters,
+def save_table_best(filename, obsid, chi2, chi2_red, variables, fluxes, filters,
                     info_keys):
     """Save the values corresponding to the best fit
 
     Parameters
     ----------
+    filename: name of the file to save
+        Name of the output file
     obsid: table column
         Names of the objects
     chi2: RawArray
@@ -176,7 +175,7 @@ def save_table_best(obsid, chi2, chi2_red, variables, fluxes, filters,
         column = Column(np_fluxes[:, index], name=name, unit='mJy')
         best_model_table.add_column(column)
 
-    best_model_table.write(OUT_DIR + BEST_MODEL_FILE,
+    best_model_table.write(OUT_DIR + filename,
                            format='ascii.commented_header')
 
 
@@ -245,3 +244,20 @@ def dchi2_over_ds2(s):
     func = dchi2_over_ds_data - dchi2_over_ds_lim
 
     return func
+
+def analyse_chi2(chi2):
+    """Function to analyse the best chi^2 and find out whether what fraction of
+    objects seem to be overconstrainted.
+
+    Parameters
+    ----------
+    chi2: RawArray
+        Contains the reduced chi^2
+
+    """
+    chi2_red = np.ctypeslib.as_array(chi2[0])
+    # If low values of reduced chi^2, it means that the data are overfitted
+    # Errors might be under-estimated or not enough valid data.
+    print("\n{}% of the objects have chi^2_red~0 and {}% chi^2_red<0.5"
+        .format(np.round((chi2_red < 1e-12).sum()/chi2_red.size, 1),
+                np.round((chi2_red < 0.5).sum()/chi2_red.size, 1)))
