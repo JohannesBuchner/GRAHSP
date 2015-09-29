@@ -238,14 +238,14 @@ class SED(object):
                 new_luminosities = interp1d(self.wavelength_grid,
                                             self.luminosities,
                                             bounds_error=False,
+                                            assume_sorted=True,
                                             fill_value=0.)(new_wavelength_grid)
 
                 # Interpolate the added luminosity array to the new wavelength
                 # grid
-                interp_lumin = interp1d(results_wavelengths,
-                                        results_lumin,
-                                        bounds_error=False,
-                                        fill_value=0)(new_wavelength_grid)
+                interp_lumin = np.interp(new_wavelength_grid,
+                                         results_wavelengths, results_lumin,
+                                         left=0., right=0.)
 
                 self.wavelength_grid = new_wavelength_grid
                 self.luminosities = np.vstack((new_luminosities, interp_lumin))
@@ -315,15 +315,15 @@ class SED(object):
         """
 
         # Filter limits
-        lambda_min = np.min(transmission[0])
-        lambda_max = np.max(transmission[0])
+        lambda_min = transmission[0][0]
+        lambda_max = transmission[0][-1]
 
         wavelength = self.wavelength_grid
         l_lambda = self.luminosity
 
         # Test if the spectrum cover all the filter extend
-        if ((np.min(self.wavelength_grid) > lambda_min) or
-                (np.max(self.wavelength_grid) < lambda_max)):
+        if ((wavelength[0] > lambda_min) or
+                (wavelength[-1] < lambda_max)):
             f_nu = -99.
 
         else:

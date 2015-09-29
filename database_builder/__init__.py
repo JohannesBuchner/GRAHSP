@@ -237,8 +237,8 @@ def build_m2005(base):
 def build_bc2003(base):
     bc03_dir = os.path.join(os.path.dirname(__file__), 'bc03//')
 
-    # Time grid (1 Myr to 20 Gyr with 1 Myr step)
-    time_grid = np.arange(1, 20000)
+    # Time grid (1 Myr to 14 Gyr with 1 Myr step)
+    time_grid = np.arange(1, 14000)
 
     # Metallicities associated to each key
     metallicity = {
@@ -321,7 +321,7 @@ def build_dale2014(base):
     data = "".join(datafile.readlines())
     datafile.close()
 
-    for al in range(1, len(alpha_grid), 1):
+    for al in range(1, len(alpha_grid)+1, 1):
         lumin_with_stell = np.genfromtxt(io.BytesIO(data.encode()),
                                          usecols=(al))
         lumin_with_stell = pow(10, lumin_with_stell) / wave

@@ -104,7 +104,8 @@ class Configuration(object):
         """
         self.config = configobj.ConfigObj(filename,
                                           write_empty_values=True,
-                                          indent_type='  ')
+                                          indent_type='  ',
+                                          encoding='UTF8')
 
     def create_blank_conf(self):
         """Create the initial configuration file
@@ -133,6 +134,7 @@ class Configuration(object):
             "Attenuation: dustatt_calzleit, dustatt_powerlaw ; "
             "Dust model: casey2012, dale2014, dl2007, dl2014 ; "
             "AGN: dale2014, fritz2006 ; "
+            "Radio: radio ; "
             "redshift: redshifting (mandatory!).")
 
         self.config['analysis_method'] = ""
