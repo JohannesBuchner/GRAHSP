@@ -27,6 +27,7 @@ from .dale2014 import Dale2014
 from .dl2007 import DL2007
 from .dl2014 import DL2014
 from .fritz2006 import Fritz2006
+from .activate import NetzerDisk, MorNetzer2012Torus, Pacifici2012Gal, FeIIferland, MorNetzerEmLines
 from .nebular_continuum import NebularContinuum
 from .nebular_lines import NebularLines
 
@@ -200,6 +201,86 @@ class _Fritz2006(BASE):
         self.lumin_therm = agn.lumin_therm
         self.lumin_scatt = agn.lumin_scatt
         self.lumin_agn = agn.lumin_agn
+
+
+# NetzerDisk, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines
+class _ActivateNetzerDisk(BASE):
+    """Storage for NetzerDisk """
+
+    __tablename__ = 'NetzerDisk'
+    M = Column(Float, primary_key=True)
+    a = Column(Float, primary_key=True)
+    Mdot = Column(Float, primary_key=True)
+    inc = Column(Float, primary_key=True)
+    wave = Column(PickleType)
+    lumin = Column(PickleType)
+
+    def __init__(self, disk):
+        self.M = disk.M
+        self.a = disk.a
+        self.Mdot = disk.Mdot
+        self.inc = disk.inc
+        self.wave = disk.wave
+        self.lumin = disk.lumin
+
+class _ActivatePacifici2012Gal(BASE):
+    """Storage for Pacifici2012Gal  """
+
+    __tablename__ = 'Pacifici2012Gal'
+    name = Column(String, primary_key=True)
+    wave = Column(PickleType)
+    lumin = Column(PickleType)
+
+    def __init__(self, gal):
+        self.name = gal.name
+        self.wave = gal.wave
+        self.lumin = gal.lumin
+
+class _ActivateMorNetzer2012Torus(BASE):
+    """Storage for MorNetzer2012Torus  """
+
+    __tablename__ = 'MorNetzer2012Torus'
+    name = Column(String, primary_key=True)
+    wave = Column(PickleType)
+    lumin = Column(PickleType)
+
+    def __init__(self, torus):
+        self.name = self.__tablename__
+        self.wave = torus.wave
+        self.lumin = torus.lumin
+
+
+
+class _ActivateFeIIferland(BASE):
+    """Storage for FeIIferland  """
+
+    __tablename__ = 'FeIIferland'
+    name = Column(String, primary_key=True)
+    wave = Column(PickleType)
+    lumin = Column(PickleType)
+
+    def __init__(self, torus):
+        self.name = self.__tablename__
+        self.wave = torus.wave
+        self.lumin = torus.lumin
+
+
+class _ActivateMorNetzerEmLines(BASE):
+    """Storage for MorNetzerEmLines  """
+
+    __tablename__ = 'MorNetzerEmLines'
+    name = Column(String, primary_key=True)
+    wave = Column(PickleType)
+    lumin_BLAGN = Column(PickleType)
+    lumin_Sy2 = Column(PickleType)
+    lumin_LINER = Column(PickleType)
+
+    def __init__(self, em):
+        self.name = self.__tablename__
+        self.wave = em.wave
+        self.lumin_BLAGN = em.lumin_BLAGN
+        self.lumin_Sy2 = em.lumin_Sy2
+        self.lumin_LINER = em.lumin_LINER
 
 
 class _NebularLines(BASE):
@@ -694,6 +775,212 @@ class Database(object):
             dictionary of parameters and their values
         """
         return self._get_parameters(_Fritz2006)
+
+# ----------- begin activate code
+
+    def add_ActivateNetzerDisk(self, agn):
+        """
+        Add a NetzerDisk to the database.
+        """
+        if self.is_writable:
+            self.session.add(_ActivateNetzerDisk(agn))
+            try:
+                self.session.commit()
+            except exc.IntegrityError:
+                self.session.rollback()
+                raise DatabaseInsertError(
+                    'The NetzerDisk model is already in the base.')
+        else:
+            raise Exception('The database is not writable.')
+
+    def add_ActivatePacifici2012Gal(self, gal):
+        """
+        Add Pacifici2012Gal to the database.
+        """
+        if self.is_writable:
+            self.session.add(_ActivatePacifici2012Gal(gal))
+            try:
+                self.session.commit()
+            except exc.IntegrityError:
+                self.session.rollback()
+                raise DatabaseInsertError(
+                    'The Pacifici2012Gal model is already in the base.')
+        else:
+            raise Exception('The database is not writable.')
+
+    def add_ActivateMorNetzer2012Torus(self, agn):
+        """
+        Add MorNetzer2012Torus to the database.
+        """
+        if self.is_writable:
+            self.session.add(_ActivateMorNetzer2012Torus(agn))
+            try:
+                self.session.commit()
+            except exc.IntegrityError:
+                self.session.rollback()
+                raise DatabaseInsertError(
+                    'The NetzerDisk model is already in the base.')
+        else:
+            raise Exception('The database is not writable.')
+
+    def add_ActivateFeIIferland(self, agn):
+        """
+        Add FeIIferland to the database.
+        """
+        if self.is_writable:
+            self.session.add(_ActivateFeIIferland(agn))
+            try:
+                self.session.commit()
+            except exc.IntegrityError:
+                self.session.rollback()
+                raise DatabaseInsertError(
+                    'The NetzerDisk model is already in the base.')
+        else:
+            raise Exception('The database is not writable.')
+
+    def add_ActivateMorNetzerEmLines(self, agn):
+        """
+        Add MorNetzerEmLines to the database.
+        """
+        if self.is_writable:
+            self.session.add(_ActivateMorNetzerEmLines(agn))
+            try:
+                self.session.commit()
+            except exc.IntegrityError:
+                self.session.rollback()
+                raise DatabaseInsertError(
+                    'The MorNetzerEmLines model is already in the base.')
+        else:
+            raise Exception('The database is not writable.')
+    
+
+    def get_ActivateNetzerDisk(self, M, a, Mdot, inc):
+        """
+        Get the NetzerDisk model corresponding to the number.
+
+        Parameters
+        ----------
+        M: float
+            Mass (log, in units of Msun)
+        a: float
+            Spin parameter
+        Mdot: float
+            Eddington accretion rate
+        inc: float
+            Inclination
+
+        Returns
+        -------
+        agn: pcigale.data.NetzerDisk
+            The disk model.
+
+        Raises
+        ------
+        DatabaseLookupError: if the requested template is not in the database.
+
+        """
+        result = (self.session.query(_ActivateNetzerDisk).
+                  filter(_ActivateNetzerDisk.M == M).
+                  filter(_ActivateNetzerDisk.a == a).
+                  filter(_ActivateNetzerDisk.Mdot == Mdot).
+                  filter(_ActivateNetzerDisk.inc == inc).
+                  first())
+        if result:
+            return NetzerDisk(result.M, result.a, result.Mdot,
+                             result.inc, result.wave, result.lumin)
+        else:
+            raise DatabaseLookupError(
+                "The NetzerDisk model is not in the database.")
+
+    def get_ActivateNetzerDisk_parameters(self):
+        """Get parameters for Netzer disk models.
+
+        Returns
+        -------
+        paramaters: dictionary
+            dictionary of parameters and their values
+        """
+        return self._get_parameters(_ActivateNetzerDisk)
+
+    def get_ActivatePacifici2012Gal(self, name):
+        """Get the NetzerTorus model """
+        result = (self.session.query(_ActivatePacifici2012Gal).filter(_ActivatePacifici2012Gal.name == name).first())
+        if result:
+            return Pacifici2012Gal(name, result.wave, result.lumin)
+        else:
+            raise DatabaseLookupError(
+                "The Pacifici2012Gal model is not in the database.")
+
+    def get_ActivatePacifici2012Gal_parameters(self):
+        """Get parameters for NetzerTorus models.
+
+        Returns
+        -------
+        paramaters: dictionary
+            dictionary of parameters and their values
+        """
+        return self._get_parameters(_ActivatePacifici2012Gal)
+
+
+    def get_ActivateMorNetzer2012Torus(self):
+        """Get the NetzerTorus model """
+        result = (self.session.query(_ActivateMorNetzer2012Torus).first())
+        if result:
+            return MorNetzer2012Torus(result.wave, result.lumin)
+        else:
+            raise DatabaseLookupError(
+                "The MorNetzer2012Torus model is not in the database.")
+
+    def get_ActivateMorNetzer2012Torus_parameters(self):
+        """Get parameters for NetzerTorus models.
+
+        Returns
+        -------
+        paramaters: dictionary
+            dictionary of parameters and their values
+        """
+        return self._get_parameters(_ActivateMorNetzer2012Torus)
+
+
+    def get_ActivateFeIIferland(self):
+        """Get the NetzerTorus model """
+        result = (self.session.query(_ActivateFeIIferland).first())
+        if result:
+            return FeIIferland(result.wave, result.lumin)
+        else:
+            raise DatabaseLookupError(
+                "The FeIIferland model is not in the database.")
+
+    def get_ActivateFeIIferland_parameters(self):
+        """Get parameters for NetzerTorus models.
+
+        Returns
+        -------
+        paramaters: dictionary
+            dictionary of parameters and their values
+        """
+        return self._get_parameters(_ActivateFeIIferland)
+
+    def get_ActivateMorNetzerEmLines(self):
+        """Get the NetzerTorus model """
+        result = (self.session.query(_ActivateMorNetzerEmLines).first())
+        if result:
+            return MorNetzerEmLines(result.wave, result.lumin_BLAGN, result.lumin_Sy2, result.lumin_LINER)
+        else:
+            raise DatabaseLookupError(
+                "The MorNetzer2012Torus model is not in the database.")
+
+    def get_ActivateMorNetzerEmLines_parameters(self):
+        """Get parameters for NetzerTorus models.
+
+        Returns
+        -------
+        paramaters: dictionary
+            dictionary of parameters and their values
+        """
+        return self._get_parameters(_ActivateMorNetzerEmLines)
+
+# ----------
 
     def add_nebular_lines(self, nebular_lines):
         """

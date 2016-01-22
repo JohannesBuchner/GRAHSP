@@ -129,11 +129,11 @@ class Configuration(object):
         self.config.comments['creation_modules'] = [""] + wrap(
             "Order of the modules use for SED creation. Available modules: "
             "SFH: sfh2exp, sfhdelayed, sfhfromfile, sfhperiodic ; "
-            "SSP: bc03, m2005 ; "
+            "SSP: bc03, m2005, pacifici2012 ; "
             "Nebular: nebular ; "
             "Attenuation: dustatt_calzleit, dustatt_powerlaw ; "
             "Dust model: casey2012, dale2014, dl2007, dl2014 ; "
-            "AGN: dale2014, fritz2006 ; "
+            "AGN: dale2014, fritz2006, activate ; "
             "Radio: radio ; "
             "redshift: redshifting (mandatory!).")
 

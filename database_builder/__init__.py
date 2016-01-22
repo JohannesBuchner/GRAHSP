@@ -21,7 +21,8 @@ from scipy import interpolate
 import scipy.constants as cst
 from pcigale.data import (Database, Filter, M2005, BC03, Fritz2006,
                           Dale2014, DL2007, DL2014, NebularLines,
-                          NebularContinuum)
+                          NebularContinuum, 
+                          NetzerDisk, Pacifici2012Gal, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines)
 
 
 def read_bc03_ssp(filename):
@@ -142,6 +143,38 @@ def build_filters(base):
         with open(filter_file, 'r') as filter_file_read:
             filter_name = filter_file_read.readline().strip('# \n\t')
             filter_type = filter_file_read.readline().strip('# \n\t')
+            filter_description = filter_file_read.readline().strip('# \n\t')
+        filter_table = np.genfromtxt(filter_file)
+        # The table is transposed to have table[0] containing the wavelength
+        # and table[1] containing the transmission.
+        filter_table = filter_table.transpose()
+        # We convert the wavelength from Å to nm.
+        filter_table[0] *= 0.1
+
+        print("Importing %s... (%s points)" % (filter_name,
+                                               filter_table.shape[1]))
+
+        new_filter = Filter(filter_name, filter_description,
+                            filter_type, filter_table)
+
+        # We normalise the filter and compute the effective wavelength.
+        # If the filter is a pseudo-filter used to compute line fluxes, it
+        # should not be normalised.
+        if not filter_name.startswith('PSEUDO'):
+            new_filter.normalise()
+        else:
+            new_filter.effective_wavelength = np.mean(
+                filter_table[0][filter_table[1] > 0]
+            )
+
+        base.add_filter(new_filter)
+
+def build_cosmos_filters(base):
+    filters_dir = os.path.join(os.path.dirname(__file__), 'filters/cosmos/')
+    for filter_file in glob.glob(filters_dir + '*.*'):
+        with open(filter_file, 'r') as filter_file_read:
+            filter_name = 'cosmos/' + os.path.basename(filter_file)
+            filter_type = 'energy'
             filter_description = filter_file_read.readline().strip('# \n\t')
         filter_table = np.genfromtxt(filter_file)
         # The table is transposed to have table[0] containing the wavelength
@@ -599,6 +632,110 @@ def build_fritz2006(base):
                                          lumin_therm, lumin_scatt, lumin_agn))
 
 
+def build_activate(base):
+    activate_dir = os.path.join(os.path.dirname(__file__), 'activate/')
+
+    # conversion from Fnu to Flam:
+    # nu = c/lam
+    # Fnu = nu^3/c^2 = c^3/lam^3/c^2 = c/lam^3
+    # Flam = c^2/lam^5 = Fnu * c / lam^2
+    
+    
+    # galaxy template by Camilla Pacifici
+    print("Importing Activate Pacifici2012Gal ...")
+    for name in ['qui', 'sf']:
+        for i in range(1, 1000):
+            filename = activate_dir + "gal/template_%s%d.dat" % (name, i)
+            if not os.path.exists(filename):
+                break
+            print("    parsing %s ..." % filename)
+            data = np.genfromtxt(filename)
+            wave = data[:,0] / 10. # A to nm
+            Llam = data[:,1]
+            base.add_ActivatePacifici2012Gal(Pacifici2012Gal("%s%d" % (name, i), wave, Llam))
+    del data, Llam, wave
+    
+    # Mor Netzer disk templates: M, Mdot, a
+    M = ["6.0", "9.0"] #, "8.0"] #(neglect the last one for the moment)
+    a = ["0","0.998"]
+    Mdot = ["0.03","0.3"]
+    inc = ["0"]
+    print("Importing Activate NetzerDisk ...")
+    datafile = open(activate_dir + "agn/mor_netzer_2012/table_of_disk_models")
+    data = "".join(datafile.readlines()[18:][::-1]) # reverse
+    datafile.close()
+    data = np.genfromtxt(io.BytesIO(data.encode()))
+    wave = data[:,1] * 0.1 # A -> nm
+    freq = data[:,0]
+    c = 3.0e18 # arbitrary units, we only care about the shape
+    
+    for i, (Mv, av, Mdotv) in enumerate([(0,1,1),(0,1,0),(0,0,0),(0,0,1),(1,1,1),(1,1,0),(1,0,0),(1,0,1)]):
+        Lnu = data[:,2+i]
+        assert (Lnu >= 0).all(), (Lnu)
+        Llam = Lnu * freq**2 / c
+        assert (Llam >= 0).all(), (Llam)
+        params = (M[Mv], a[av], Mdot[Mdotv], inc[0])
+        # normalise so that at 510nm, it is 1
+        norm = np.interp(510.0, wave, Llam)
+        assert norm > 0, (norm, wave, Llam)
+        Llam = Llam / norm
+        assert (Llam >= 0).all(), (Llam, norm)
+        print("norm:", norm, " for ", params)
+        base.add_ActivateNetzerDisk(NetzerDisk(params[0], params[1], params[2],
+                                         params[3], wave, Llam))
+        del Llam, Lnu
+    del wave
+    
+    # Mor Netzer torus template
+    print("Importing Activate MorNetzer2012Torus ...")
+    data = np.genfromtxt(activate_dir + "agn/mor_netzer_2012/mor_netzer_2012_AGN_SED_combined_with_100K_grey_body")
+    wave = data[:,0] * 1000 # micron to nm
+    freq = c / wave
+    nuLnu = data[:,1] # is multiplied by frequency
+    assert wave[0] == 510.0, wave[0] # normalisation
+    Llam = nuLnu / freq * c / wave**2 
+    # normalise so that at 510nm, it is 1
+    norm = Llam[0] # get normalisation
+    assert norm > 0, (norm, Llam)
+    Llam = Llam / norm
+    mask = wave > 1000 # model is valid above 1um
+    assert (Llam >= 0).all(), Llam
+    base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(wave[mask], Llam[mask]))
+    del Llam, mask, norm, wave
+
+    # FeII template
+    print("Importing Activate FeIIferland ...")
+    data = np.genfromtxt(activate_dir + "agn/FeII_template/Fe_d11-m20-20.5.txt")
+    wavez = data[:,0]
+    # this template is slightly redshifted, by z=0.004
+    z = 4593.4/4575 - 1
+    wave = wavez / (1+z)
+    Lnu = data[:,1]
+    assert wave.shape == Lnu.shape, (wave.shape, Lnu.shape)
+    Llam = Lnu * c / wavez**2
+    assert wave.shape == Llam.shape, (wave.shape, Llam.shape)
+    assert (Llam >= 0).all(), Llam
+    # normalisation at FeII 4575
+    norm = np.max(Llam[wavez == 4593.4])
+    #norm = np.interp(457.5, wave, Llam)
+    assert norm > 0, (norm, Llam)
+    Llam = Llam / norm
+    print('    largest luminosity after normalising:', np.max(Llam))
+    assert norm == 8.30E+06 * c / 4593.4**2, (norm, 8.30E+06 * c / 4593.4**2, np.max(Llam))
+    assert wave.shape == Llam.shape, (wave.shape, Llam.shape)
+    base.add_ActivateFeIIferland(FeIIferland(wave * 0.1, Llam))
+    del Llam, norm, wave
+    
+    # Emission line list & strengths
+    print("Importing Activate MorNetzerEmLines ...")
+    # normalise so that Hb = 1 -- already done so in that file
+    data = np.loadtxt(activate_dir + 'agn/mor_netzer_2012/emission_line_table.formatted', 
+    	dtype=[('name', 'S10'), ('wave', 'f'), ('broad', 'f'), ('S2', 'f'), ('LINER', 'f')])
+    assert (data['broad'] >= 0).all(), data
+    assert (data['S2'] >= 0).all(), data
+    assert (data['LINER'] >= 0).all(), data
+    base.add_ActivateMorNetzerEmLines(MorNetzerEmLines(data['wave'] * 0.1, data['broad'], data['S2'], data['LINER']))
+    
 def build_nebular(base):
     lines_dir = os.path.join(os.path.dirname(__file__), 'nebular/')
 
@@ -664,6 +801,7 @@ def build_nebular(base):
 def build_base():
     base = Database(writable=True)
     base.upgrade_base()
+    
 
     print('#' * 78)
     print("1- Importing filters...\n")
@@ -691,6 +829,11 @@ def build_base():
     print("\nDONE\n")
     print('#' * 78)
 
+    print("6- Importing Activate models\n")
+    build_activate(base)
+    print("\nDONE\n")
+    print('#' * 78)
+    
     print("6- Importing Fritz et al. (2006) models\n")
     build_fritz2006(base)
     print("\nDONE\n")
@@ -708,6 +851,23 @@ def build_base():
 
     base.session.close_all()
 
+def build_base():
+    base = Database(writable=True)
+    base.upgrade_base()
+    
+    print('#' * 78)
+    print("1- Importing filters...\n")
+    build_cosmos_filters(base)
+    build_filters(base)
+    print("\nDONE\n")
+    print('#' * 78)
+
+    print("6- Importing Activate models\n")
+    build_activate(base)
+    print("\nDONE\n")
+    print('#' * 78)
+    
+    base.session.close_all()
 
 if __name__ == '__main__':
     build_base()
