@@ -197,7 +197,7 @@ class SED(object):
         if self.luminosity is None:
             self.wavelength_grid = results_wavelengths.copy()
             self.luminosity = results_lumin.copy()
-            self.luminosities = results_lumin.copy()
+            self.luminosities = np.array([results_lumin])
         else:
             # If the added luminosity contribution changes the SED wavelength
             # grid, we interpolate everything on a common wavelength grid.
@@ -309,6 +309,8 @@ class SED(object):
             # filter one.
             w = np.where((wavelength >= lambda_min) &
                          (wavelength <= lambda_max))
+            if len(w) == 0:
+               return -99.
             wavelength_r = utils.best_grid(wavelength[w], trans_table[0])
             transmission_r = np.interp(wavelength_r, trans_table[0],
                                        trans_table[1])
