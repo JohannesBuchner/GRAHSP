@@ -151,7 +151,6 @@ class Activate(CreationModule):
         l_broadlines = 0.02 * l_agn
         l_narrowlines = 0.002 * l_agn
         if agnType == 1: # BLAGN
-            linecol = 0
             self.add_lines(sed, 'agn.activate_EmLines_BL', self.emLines.wave,
                                  l_broadlines * self.emLines.lumin_BLAGN)
             self.add_lines(sed, 'agn.activate_EmLines_NL', self.emLines.wave,

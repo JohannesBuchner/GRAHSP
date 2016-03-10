@@ -28,6 +28,7 @@ from .dl2007 import DL2007
 from .dl2014 import DL2014
 from .fritz2006 import Fritz2006
 from .activate import NetzerDisk, MorNetzer2012Torus, Pacifici2012Gal, FeIIferland, MorNetzerEmLines
+from .extinction import ExtinctionLaw
 from .nebular_continuum import NebularContinuum
 from .nebular_lines import NebularLines
 
@@ -201,6 +202,19 @@ class _Fritz2006(BASE):
         self.lumin_therm = agn.lumin_therm
         self.lumin_scatt = agn.lumin_scatt
         self.lumin_agn = agn.lumin_agn
+
+class _ExtinctionLaw(BASE):
+    """Storage for ExtinctionLaw """
+
+    __tablename__ = 'ExtinctionLaw'
+    name = Column(String, primary_key=True)
+    wave = Column(PickleType)
+    k = Column(PickleType)
+
+    def __init__(self, law):
+        self.name = law.name
+        self.wave = law.wave
+        self.k = law.k
 
 
 # NetzerDisk, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines
@@ -778,6 +792,22 @@ class Database(object):
 
 # ----------- begin activate code
 
+    def add_ExtinctionLaw(self, law):
+        """
+        Add ExtinctionLaw to the database.
+        """
+        if self.is_writable:
+            self.session.add(_ExtinctionLaw(law))
+            try:
+                self.session.commit()
+            except exc.IntegrityError:
+                self.session.rollback()
+                raise DatabaseInsertError(
+                    'The ExtinctionLaw model is already in the base.')
+        else:
+            raise Exception('The database is not writable.')
+
+
     def add_ActivateNetzerDisk(self, agn):
         """
         Add a NetzerDisk to the database.
@@ -901,6 +931,26 @@ class Database(object):
             dictionary of parameters and their values
         """
         return self._get_parameters(_ActivateNetzerDisk)
+
+    def get_ExtinctionLaw(self, name):
+        """Get the ExtinctionLaw model """
+        result = (self.session.query(_ExtinctionLaw).filter(_ExtinctionLaw.name == name).first())
+        if result:
+            return ExtinctionLaw(name, result.wave, result.k)
+        else:
+            raise DatabaseLookupError(
+                "The ExtinctionLaw model is not in the database.")
+
+    def get_ExtinctionLaw_parameters(self):
+        """Get parameters for ExtinctionLaw models.
+
+        Returns
+        -------
+        paramaters: dictionary
+            dictionary of parameters and their values
+        """
+        return self._get_parameters(_ExtinctionLaw)
+
 
     def get_ActivatePacifici2012Gal(self, name):
         """Get the NetzerTorus model """

@@ -22,7 +22,8 @@ import scipy.constants as cst
 from pcigale.data import (Database, Filter, M2005, BC03, Fritz2006,
                           Dale2014, DL2007, DL2014, NebularLines,
                           NebularContinuum, 
-                          NetzerDisk, Pacifici2012Gal, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines)
+                          NetzerDisk, Pacifici2012Gal, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines,
+                          ExtinctionLaw)
 
 
 def read_bc03_ssp(filename):
@@ -175,6 +176,8 @@ def build_cosmos_filters(base):
         with open(filter_file, 'r') as filter_file_read:
             filter_name = 'cosmos/' + os.path.basename(filter_file)
             filter_type = 'energy'
+            if 'irac' in filter_name.lower():
+                 filter_type = 'photon'
             filter_description = filter_file_read.readline().strip('# \n\t')
         filter_table = np.genfromtxt(filter_file)
         # The table is transposed to have table[0] containing the wavelength
@@ -186,6 +189,14 @@ def build_cosmos_filters(base):
         print("Importing %s... (%s points)" % (filter_name,
                                                filter_table.shape[1]))
 
+        if 'irac' in filter_name.lower():
+            # weigh by wavelength. Filter type 1 in LePhare
+            # this is necessary because FIR filters are energy-weighted, not
+            # photon-weighted.
+            print("    reweighing by wavelength")
+            lam_mean = np.mean(filter_table[0][filter_table[1] > 0])
+            filter_table[1] = filter_table[1] * filter_table[0] / lam_mean
+        
         new_filter = Filter(filter_name, filter_description,
                             filter_type, filter_table)
 
@@ -640,6 +651,15 @@ def build_activate(base):
     # Fnu = nu^3/c^2 = c^3/lam^3/c^2 = c/lam^3
     # Flam = c^2/lam^5 = Fnu * c / lam^2
     
+    # Prevot attenuation template
+    print("Importing Activate Prevot attenuation ...")
+    filename = activate_dir + "absorption/SMC_prevot.dat"
+    print("    parsing %s ..." % filename)
+    data = np.genfromtxt(filename)
+    wave = data[:,0] / 10. # A to nm
+    k = data[:,1]
+    base.add_ExtinctionLaw(ExtinctionLaw("Prevot", wave, k))
+    del data, wave, k
     
     # galaxy template by Camilla Pacifici
     print("Importing Activate Pacifici2012Gal ...")
@@ -695,7 +715,7 @@ def build_activate(base):
     assert wave[0] == 510.0, wave[0] # normalisation
     Llam = nuLnu / freq * c / wave**2 
     # normalise so that at 510nm, it is 1
-    norm = Llam[0] # get normalisation
+    norm = Llam[wave == 12000] # get normalisation at 12um
     assert norm > 0, (norm, Llam)
     Llam = Llam / norm
     mask = wave > 1000 # model is valid above 1um
