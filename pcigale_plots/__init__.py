@@ -162,19 +162,31 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
             ax2 = plt.subplot(gs[1])
 
             # Stellar emission
-            ax1.loglog(wavelength_spec[wsed],
-                       (sed['stellar.young'][wsed] +
-                        sed['attenuation.stellar.young'][wsed] +
-                        sed['stellar.old'][wsed] +
-                        sed['attenuation.stellar.old'][wsed]),
-                       label="Stellar attenuated ", color='orange',
-                       marker=None, nonposy='clip', linestyle='-',
-                       linewidth=0.5)
-            ax1.loglog(wavelength_spec[wsed],
-                       (sed['stellar.old'][wsed] +
-                        sed['stellar.young'][wsed]),
-                       label="Stellar unattenuated", color='b', marker=None,
-                       nonposy='clip', linestyle='--', linewidth=0.5)
+            #ax1.loglog(wavelength_spec[wsed],
+            #           (sed['stellar.young'][wsed] +
+            #            sed['attenuation.stellar.young'][wsed] +
+            #            sed['stellar.old'][wsed] +
+            #            sed['attenuation.stellar.old'][wsed]),
+            #           label="Stellar attenuated ", color='orange',
+            #           marker=None, nonposy='clip', linestyle='-',
+            #           linewidth=0.5)
+            #ax1.loglog(wavelength_spec[wsed],
+            #           (sed['stellar.old'][wsed] +
+            #            sed['stellar.young'][wsed]),
+            #           label="Stellar unattenuated", color='b', marker=None,
+            #           nonposy='clip', linestyle='--', linewidth=0.5)
+            if 'gal.Pacifici2012' in sed.columns:
+                ax1.loglog(wavelength_spec[wsed],
+                    sed['gal.Pacifici2012'][wsed] + sed['attenuation.gal.Pacifici2012'][wsed],
+                    label="Stellar attenuated ", color='orange',
+                    marker=None, nonposy='clip', linestyle='-',
+                    linewidth=0.5)
+                ax1.loglog(wavelength_spec[wsed],
+                    sed['gal.Pacifici2012'][wsed],
+                    label="Stellar unattenuated ", color='orange',
+                    marker=None, nonposy='clip', linestyle='-',
+                    linewidth=0.5)
+                
             # Nebular emission
             if 'nebular.lines_young' in sed.columns:
                 ax1.loglog(wavelength_spec[wsed],
@@ -208,6 +220,15 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
                             sed['agn.fritz2006_agn'][wsed]),
                            label="AGN emission", color='g', marker=None,
                            nonposy='clip', linestyle='-', linewidth=0.5)
+            colors = [[0.90, 0.90, 0.72],[0.90, 0.77, 0.42],[0.90, 0.50, 0.21],[0.89, 0.10, 0.11],[0.50, 0.00, 0.15]]
+            components = 'agn.activate_Disk agn.activate_Torus agn.activate_EmLines_BL agn.activate_EmLines_NL agn.activate_FeLines agn.activate_EmLines_LINER'.split()
+            for k, color in zip(components, colors):
+                if k in sed.columns:
+                    ax1.loglog(wavelength_spec[wsed],
+                        sed[k][wsed] + sed['attenuation.%s' % k][wsed],
+                        label="%s" % k, color=color,
+                        marker=None, nonposy='clip', linestyle='-',
+                        linewidth=0.5)
             # Radio emission
             if 'radio_nonthermal' in sed.columns:
                 ax1.loglog(wavelength_spec[wsed],
