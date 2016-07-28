@@ -49,6 +49,9 @@ class Pacifici2012(CreationModule):
         sed.add_module(self.name, self.parameters)
         #sed.add_info('gal.SFR', self.parameters["M"])
         sed.add_contribution('gal.Pacifici2012', self.gal.wave, self.gal.lumin)
+        template = self.parameters["template"]
+        template_index = int(template.replace('sf', '100').replace('qui', '000'))
+        sed.add_info('gal.Pacifici2012.template', template_index)
 
 # CreationModule to be returned by get_module
 Module = Pacifici2012

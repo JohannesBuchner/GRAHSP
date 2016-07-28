@@ -8,6 +8,7 @@
 
 import argparse
 from astropy.table import Table
+from astropy.io.votable import parse
 from itertools import product, repeat
 from collections import OrderedDict
 import matplotlib
@@ -32,7 +33,8 @@ BEST_MODEL_FILE = "best_models.txt"
 OUT_DIR = "out/"
 # Wavelength limits (restframe) when plotting the best SED.
 PLOT_L_MIN = 0.1
-PLOT_L_MAX = 5e5
+#PLOT_L_MAX = 5e5
+PLOT_L_MAX = 50
 
 
 def _chi2_worker(obj_name, var_name):
@@ -114,6 +116,9 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
 
         sed = Table.read(OUT_DIR + "{}_best_model.xml".format(obs['id']),
                          table_id="Flambda")
+        
+        votable = parse(OUT_DIR + "{}_best_model.xml".format(obs['id']))
+        props = dict([(i.name, i.value) for i in votable.infos])
 
         filters_wl = np.array([filt.effective_wavelength
                                for filt in filters.values()])
@@ -162,30 +167,37 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
             ax2 = plt.subplot(gs[1])
 
             # Stellar emission
-            #ax1.loglog(wavelength_spec[wsed],
-            #           (sed['stellar.young'][wsed] +
-            #            sed['attenuation.stellar.young'][wsed] +
-            #            sed['stellar.old'][wsed] +
-            #            sed['attenuation.stellar.old'][wsed]),
-            #           label="Stellar attenuated ", color='orange',
-            #           marker=None, nonposy='clip', linestyle='-',
-            #           linewidth=0.5)
-            #ax1.loglog(wavelength_spec[wsed],
-            #           (sed['stellar.old'][wsed] +
-            #            sed['stellar.young'][wsed]),
-            #           label="Stellar unattenuated", color='b', marker=None,
-            #           nonposy='clip', linestyle='--', linewidth=0.5)
+            if 'stellar.young' in sed.columns and 'stellar.old' in sed.columns and 'attenuation.stellar.young' in sed.columns and 'attenuation.stellar.old' in sed.columns:
+                    ax1.loglog(wavelength_spec[wsed],
+                               (sed['stellar.young'][wsed] +
+                                sed['attenuation.stellar.young'][wsed] +
+                                sed['stellar.old'][wsed] +
+                                sed['attenuation.stellar.old'][wsed]),
+                               label="Stellar attenuated ", color='orange',
+                               marker=None, nonposy='clip', linestyle='-',
+                               linewidth=0.5)
+                    ax1.loglog(wavelength_spec[wsed],
+                               (sed['stellar.old'][wsed] +
+                                sed['stellar.young'][wsed]),
+                               label="Stellar unattenuated", color='b', marker=None,
+                               nonposy='clip', linestyle='--', linewidth=0.5)
             if 'gal.Pacifici2012' in sed.columns:
+                template_index = int(float(props['gal.Pacifici2012.template']))
+                if template_index > 1000:
+                   template_name = 'sf%d' % (template_index - 1000)
+                else:
+                   template_name = 'qui%d' % (template_index)
+                
                 ax1.loglog(wavelength_spec[wsed],
                     sed['gal.Pacifici2012'][wsed] + sed['attenuation.gal.Pacifici2012'][wsed],
-                    label="Stellar attenuated ", color='orange',
+                    label="Pacifici2012/%s attenuated E(B-V)=%s" % (template_name, props['attenuation.ebv']), color='cyan',
                     marker=None, nonposy='clip', linestyle='-',
                     linewidth=0.5)
                 ax1.loglog(wavelength_spec[wsed],
                     sed['gal.Pacifici2012'][wsed],
-                    label="Stellar unattenuated ", color='orange',
+                    label="Pacifici2012/%s unattenuated " % template_name, color='cyan',
                     marker=None, nonposy='clip', linestyle='-',
-                    linewidth=0.5)
+                    linewidth=0.5, alpha=0.3)
                 
             # Nebular emission
             if 'nebular.lines_young' in sed.columns:
@@ -224,9 +236,19 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
             components = 'agn.activate_Disk agn.activate_Torus agn.activate_EmLines_BL agn.activate_EmLines_NL agn.activate_FeLines agn.activate_EmLines_LINER'.split()
             for k, color in zip(components, colors):
                 if k in sed.columns:
+                    label = k
+                    if k == 'agn.activate_Disk':
+                       label += ' frac=%s M=%s a=%s Mdot=%s' % (props['agn.fracAGN'], 
+                                props['agn.M'], props['agn.a'], props['agn.Mdot'])
+                    if k == 'agn.activate_Torus':
+                       label += ' cov=%s' % (props['agn.fcov'])
+                    elif 'FeLines' in k:
+                       label += ' AFeII=%s' % props['agn.AFeII']
+                    elif 'Line' in k:
+                       label += ' type %d' % float(props['agn.type'])
                     ax1.loglog(wavelength_spec[wsed],
                         sed[k][wsed] + sed['attenuation.%s' % k][wsed],
-                        label="%s" % k, color=color,
+                        label=label, color=color,
                         marker=None, nonposy='clip', linestyle='-',
                         linewidth=0.5)
             # Radio emission
@@ -239,7 +261,7 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
 
             ax1.loglog(wavelength_spec[wsed], sed['F_lambda_total'][wsed],
                        label="Model spectrum", color='k', nonposy='clip',
-                       linestyle='-', linewidth=1.5)
+                       linestyle='-', linewidth=1.5, alpha=0.7)
 
             ax1.set_autoscale_on(False)
             ax1.scatter(filters_wl, mod_fluxes, marker='o', color='r', s=8,
@@ -270,7 +292,7 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
                          (obs_fluxes[mask]-mod_fluxes[mask])/obs_fluxes[mask],
                          yerr=obs_fluxes_err[mask]/obs_fluxes[mask]*3,
                          marker='_', label="(Obs-Mod)/Obs", color='k',
-                         capsize=0.)
+                         capsize=0., linestyle=' ')
             ax2.plot([xmin, xmax], [0., 0.], ls='--', color='k')
             ax2.set_xscale('log')
             ax2.minorticks_on()
@@ -278,17 +300,22 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
             figure.subplots_adjust(hspace=0., wspace=0.)
 
             ax1.set_xlim(xmin, xmax)
-            ymin = min(np.min(obs_fluxes[mask_ok]),
-                       np.min(mod_fluxes[mask_ok]))
+            ymin = min(np.nanmin(obs_fluxes[mask_ok]),
+                       np.nanmin(mod_fluxes[mask_ok]))
             if not mask_uplim.any() == False:
-                ymax = max(max(np.max(obs_fluxes[mask_ok]),
-                               np.max(obs_fluxes[mask_uplim])),
-                           max(np.max(mod_fluxes[mask_ok]),
-                               np.max(mod_fluxes[mask_uplim])))
+                ymax = max(max(np.nanmax(obs_fluxes[mask_ok]),
+                               np.nanmax(obs_fluxes[mask_uplim])),
+                           max(np.nanmax(mod_fluxes[mask_ok]),
+                               np.nanmax(mod_fluxes[mask_uplim])))
             else:
-                ymax = max(np.max(obs_fluxes[mask_ok]),
-                           np.max(mod_fluxes[mask_ok]))
-            ax1.set_ylim(1e-1*ymin, 1e1*ymax)
+                ymax = max(np.nanmax(obs_fluxes[mask_ok]),
+                           np.nanmax(mod_fluxes[mask_ok]))
+            if np.isinf(ymax):
+                ymax = 100 * ymin
+            if np.isinf(ymin):
+                ymin = ymax / 100
+            print(obs['id'], ymin, ymax)
+            ax1.set_ylim(1e-2*ymin, 1e1*ymax)
             ax2.set_xlim(xmin, xmax)
             ax2.set_ylim(-1.0, 1.0)
             if sed_type == 'lum':

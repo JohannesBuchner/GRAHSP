@@ -143,7 +143,10 @@ class Activate(CreationModule):
 
         # Add torus for NIR-MIR continuum
         # formula of Netzer (readme)
-        l_torus = 1.25 * l_agn * fcov
+        # l_torus * 12um = 1.25 * l_agn * 510nm * fcov
+        # l_agn is defined at 510nm, l_torus at 12um
+        # because both are nu*L_nu = lam*L_lam normalisations, we need a
+        l_torus = 1.25 * l_agn * fcov * 12 / 0.510
         sed.add_contribution('agn.activate_Torus', self.torus.wave,
                              l_torus * self.torus.lumin)
         #print(' torus', self.torus.wave, l_torus, self.torus.lumin)

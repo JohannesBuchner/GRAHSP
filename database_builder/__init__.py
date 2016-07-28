@@ -715,7 +715,7 @@ def build_activate(base):
     assert wave[0] == 510.0, wave[0] # normalisation
     Llam = nuLnu / freq * c / wave**2 
     # normalise so that at 510nm, it is 1
-    norm = Llam[wave == 12000] # get normalisation at 12um
+    norm = Llam[wave == 12000][0] # get normalisation at 12um
     assert norm > 0, (norm, Llam)
     Llam = Llam / norm
     mask = wave > 1000 # model is valid above 1um
