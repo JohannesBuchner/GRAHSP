@@ -1,12 +1,4 @@
-# text format catalogue file --- do not edit manually, use 'lc'
-# header:
-# text     1 1         byteorder                BIG_ENDIAN
-# comment: history: lc -C -n l -n t
-# comment: history: lc 'l' 't = %t %l / 4.5795612e-06 /'
-# contents: 2
-# number   1 1         l                   
-# number   1 1         t                   
-#              l              t
+# MIPS 24um
           180050  0.00028742951
           180680  0.00027917597
           181310  0.00020835335

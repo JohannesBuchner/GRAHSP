@@ -882,8 +882,18 @@ def build_base():
     print("\nDONE\n")
     print('#' * 78)
 
+    print("3- Importing Bruzual and Charlot 2003 SSP\n")
+    build_bc2003(base)
+    print("\nDONE\n")
+    print('#' * 78)
+
     print("6- Importing Activate models\n")
     build_activate(base)
+    print("\nDONE\n")
+    print('#' * 78)
+
+    print("8- Importing nebular lines and continuum\n")
+    build_nebular(base)
     print("\nDONE\n")
     print('#' * 78)
     

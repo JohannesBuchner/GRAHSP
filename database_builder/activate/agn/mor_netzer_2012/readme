@@ -48,9 +48,10 @@ The Mor and Netzer 2012 template is provided in
 "mor_netzer_2012_AGN_SED_combined_with_100K_grey_body"
 The first few points with lambda<1mic do not belong to this component and can be used for normalization.
 The normalization, relative to the disk continuum is done by
-L(12 mic)=1.25xL(5100)xf(cover) where L(12mic)=lambda_L_lambda(12mic)
+L(12 mic)=2.5xL(5100)xf(cover) where L(12mic)=lambda_L_lambda(12mic)
 and f(cover) is the covering factor. For low and intermediate luminosity sources, f(cover)=0.5.
 For high luminosity sources it is smaller.
 I suggest to treat it as a free parameter in the range 0.1<f(cover)<0.7
+
 
 

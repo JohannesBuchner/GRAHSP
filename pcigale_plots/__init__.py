@@ -234,7 +234,8 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
                            nonposy='clip', linestyle='-', linewidth=0.5)
             colors = [[0.90, 0.90, 0.72],[0.90, 0.77, 0.42],[0.90, 0.50, 0.21],[0.89, 0.10, 0.11],[0.50, 0.00, 0.15]]
             components = 'agn.activate_Disk agn.activate_Torus agn.activate_EmLines_BL agn.activate_EmLines_NL agn.activate_FeLines agn.activate_EmLines_LINER'.split()
-            for k, color in zip(components, colors):
+            linewidths = [1.5, 1.5, 0.5, 0.5, 0.5, 0.5]
+            for k, color, lw in zip(components, colors, linewidths):
                 if k in sed.columns:
                     label = k
                     if k == 'agn.activate_Disk':
@@ -250,7 +251,7 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
                         sed[k][wsed] + sed['attenuation.%s' % k][wsed],
                         label=label, color=color,
                         marker=None, nonposy='clip', linestyle='-',
-                        linewidth=0.5)
+                        linewidth=lw)
             # Radio emission
             if 'radio_nonthermal' in sed.columns:
                 ax1.loglog(wavelength_spec[wsed],
@@ -302,6 +303,9 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
             ax1.set_xlim(xmin, xmax)
             ymin = min(np.nanmin(obs_fluxes[mask_ok]),
                        np.nanmin(mod_fluxes[mask_ok]))
+            #if ymin < np.nanmin(obs_fluxes[mask_ok]) / 40:
+            #     ymin = np.nanmin(obs_fluxes[mask_ok]) / 40
+            
             if not mask_uplim.any() == False:
                 ymax = max(max(np.nanmax(obs_fluxes[mask_ok]),
                                np.nanmax(obs_fluxes[mask_uplim])),
