@@ -5,11 +5,12 @@
 # Author: Yannick Roehlly, Denis Burgarella
 
 """
-Charlot and Fall (2000) power law attenuation module
+Prevot attenuation module
 ====================================================
 
-This module implements the attenuation based on a power law as defined
-in Charlot and Fall (2000) with a UV bump added.
+This module implements attenuation based on the Prevot extinction law.
+
+Also allows burying the AGN component with extra extinction.
 
 """
 
@@ -37,6 +38,11 @@ class ExtinctionLaw(CreationModule):
             "float",
             "B-V attenuation applied",
             1.
+        )),
+        ("E(B-V)-AGN", (
+            "float",
+            "Additional B-V attenuation applied to activate AGN components",
+            0.
         )),
         ("filters", (
             "string",
@@ -70,6 +76,7 @@ class ExtinctionLaw(CreationModule):
         # sed.luminosity
         
         e_bv = float(self.parameters["E(B-V)"])
+        e_bv_agn = float(self.parameters["E(B-V)-AGN"])
         
         wavelength = sed.wavelength_grid
 
@@ -84,8 +91,11 @@ class ExtinctionLaw(CreationModule):
         attenuation_total = 0.
         for contrib in list(sed.contribution_names):
             luminosity = sed.get_lumin_contribution(contrib)
+            e_bv_this = e_bv
+            if 'activate' in contrib:
+                e_bv_this += e_bv_agn 
             attenuated_luminosity = (luminosity * 10 **
-                                     (e_bv * self.sel_attenuation / -2.5))
+                                     (e_bv_this * self.sel_attenuation / -2.5))
             attenuation_spectrum = attenuated_luminosity - luminosity
             # We integrate the amount of luminosity attenuated (-1 because the
             # spectrum is negative).
@@ -115,6 +125,7 @@ class ExtinctionLaw(CreationModule):
                          -2.5 * np.log10(flux_att[filt] / flux_noatt[filt]))
 
         sed.add_info('attenuation.ebv', e_bv)
+        sed.add_info('attenuation.ebv_agn', e_bv_agn)
 
 # CreationModule to be returned by get_module
 Module = ExtinctionLaw
