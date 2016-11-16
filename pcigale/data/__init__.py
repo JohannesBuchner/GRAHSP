@@ -259,7 +259,7 @@ class _ActivateMorNetzer2012Torus(BASE):
     lumin = Column(PickleType)
 
     def __init__(self, torus):
-        self.name = self.__tablename__
+        self.name = torus.name
         self.wave = torus.wave
         self.lumin = torus.lumin
 
@@ -972,11 +972,11 @@ class Database(object):
         return self._get_parameters(_ActivatePacifici2012Gal)
 
 
-    def get_ActivateMorNetzer2012Torus(self):
+    def get_ActivateMorNetzer2012Torus(self, name):
         """Get the NetzerTorus model """
-        result = (self.session.query(_ActivateMorNetzer2012Torus).first())
+        result = (self.session.query(_ActivateMorNetzer2012Torus).filter(_ActivateMorNetzer2012Torus.name == name).first())
         if result:
-            return MorNetzer2012Torus(result.wave, result.lumin)
+            return MorNetzer2012Torus(name, result.wave, result.lumin)
         else:
             raise DatabaseLookupError(
                 "The MorNetzer2012Torus model is not in the database.")

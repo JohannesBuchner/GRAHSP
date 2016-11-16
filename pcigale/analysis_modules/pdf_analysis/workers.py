@@ -191,10 +191,12 @@ def sed(idx):
         n_computed = gbl_n_computed.value
     if n_computed % 250 == 0 or n_computed == gbl_params.size:
         t_elapsed = time.time() - gbl_t_begin
-        print("{}/{} models computed in {} seconds ({} models/s)".
+        t_left = (gbl_params.size - n_computed)*1. / (n_computed/t_elapsed) / 60.
+        print("{}/{} models computed in {} seconds ({} models/s, {} min left)".
               format(n_computed, gbl_params.size,
                      np.around(t_elapsed, decimals=1),
-                     np.around(n_computed/t_elapsed, decimals=1)),
+                     np.around(n_computed/t_elapsed, decimals=1),
+                     np.around(t_left, decimals=0)),
               end="\n" if n_computed == gbl_params.size else "\r")
 
 
@@ -405,7 +407,9 @@ def analysis(idx, obs):
         gbl_n_computed.value += 1
         n_computed = gbl_n_computed.value
     t_elapsed = time.time() - gbl_t_begin
-    print("{}/{} objects analysed in {} seconds ({} objects/s)".
+    t_left = (gbl_n_obs - n_computed)*1. / (n_computed/t_elapsed) / 60.
+    print("{}/{} objects analysed in {} seconds ({} objects/s, {} min left)".
           format(n_computed, gbl_n_obs, np.around(t_elapsed, decimals=1),
-                 np.around(n_computed/t_elapsed, decimals=2)),
+                 np.around(n_computed/t_elapsed, decimals=2),
+                 np.around(t_left, decimals=0)),
           end="\n" if n_computed == gbl_n_obs else "\r")

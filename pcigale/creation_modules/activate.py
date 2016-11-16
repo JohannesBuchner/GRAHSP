@@ -81,11 +81,13 @@ class Activate(CreationModule):
         Mdot = self.parameters["Mdot"]
         inc = self.parameters["inc"]
         agnType = self.parameters["AGNtype"]
+        # for LINERs, we still use a type-2 template
+        torustype = {1:'type-1', 2:'type-2', 3:'type-2'}[agnType]
 
         with Database() as base:
             self.disk = base.get_ActivateNetzerDisk(M, a, Mdot, inc)
             assert (self.disk.lumin >= 0).all()
-            self.torus = base.get_ActivateMorNetzer2012Torus()
+            self.torus = base.get_ActivateMorNetzer2012Torus(torustype)
             assert (self.torus.lumin >= 0).all()
             self.fe2 = base.get_ActivateFeIIferland()
             assert self.fe2.wave.shape == self.fe2.lumin.shape, (self.fe2.wave.shape, self.fe2.lumin.shape)
@@ -134,18 +136,18 @@ class Activate(CreationModule):
         assert l_agn >= 0, l_agn
         
         sed.add_info('agn.lum5100A', l_agn)
-        if agnType != 1:
-        	# truncate disk so that it does not produce UV emission
-        	# if type 2
-        	disk = numpy.where(self.disk.wave < 500, 0, self.disk.lumin)
-        else:
-        	disk = self.disk.lumin
+        #if agnType != 1:
+        #	# truncate disk so that it does not produce UV emission
+        #	# if type 2
+        #	disk = np.where(self.disk.wave < 500, 0, self.disk.lumin)
+        #else:
+        disk = self.disk.lumin
         
         # Add disk
         sed.add_contribution('agn.activate_Disk', self.disk.wave,
                              l_agn * disk)
         #print(' disk', self.disk.wave, l_agn, self.disk.lumin)
-
+        
         # Add torus for NIR-MIR continuum
         # formula of Netzer (readme)
         # l_torus * 12um = 2.5 * l_agn * 510nm * fcov

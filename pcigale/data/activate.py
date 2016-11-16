@@ -46,9 +46,10 @@ class Pacifici2012Gal(object):
 class MorNetzer2012Torus(object):
     """AGN Torus emission model."""
 
-    def __init__(self, wave, lumin):
+    def __init__(self, name, wave, lumin):
         """Create a new torus model"""
-
+        
+        self.name = name
         self.wave = wave
         self.lumin = lumin
 
