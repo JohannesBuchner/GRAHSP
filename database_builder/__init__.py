@@ -676,25 +676,27 @@ def build_activate(base):
     del data, Llam, wave
     
     # Mor Netzer disk templates: M, Mdot, a
-    M = ["6.0", "9.0"] #, "8.0"] #(neglect the last one for the moment)
-    a = ["0","0.998"]
-    Mdot = ["0.03","0.3"]
+    M = ["6.0", "7.0", "8.0", "9.0"]
+    a = ["0.998", "0"]
+    Mdot = ["0.3", "0.03"]
     inc = ["0"]
     print("Importing Activate NetzerDisk ...")
+    c = 3.0e18 # arbitrary units, we only care about the shape
+    
     datafile = open(activate_dir + "agn/mor_netzer_2012/table_of_disk_models")
-    data = "".join(datafile.readlines()[18:][::-1]) # reverse
+    data = "".join(datafile.readlines()[23:][::-1]) # reverse
     datafile.close()
     data = np.genfromtxt(io.BytesIO(data.encode()))
     wave = data[:,1] * 0.1 # A -> nm
     freq = data[:,0]
-    c = 3.0e18 # arbitrary units, we only care about the shape
-    
-    for i, (Mv, av, Mdotv) in enumerate([(0,1,1),(0,1,0),(0,0,0),(0,0,1),(1,1,1),(1,1,0),(1,0,0),(1,0,1)]):
+    #for i, (Mv, av, Mdotv) in enumerate([(0,1,1),(0,1,0),(0,0,0),(0,0,1),(1,1,1),(1,1,0),(1,0,0),(1,0,1)]):
+    options = [(Mv, av, Mdotv) for av in a for Mdotv in Mdot for Mv in M]
+    for i, (Mv, av, Mdotv) in enumerate(options):
         Lnu = data[:,2+i]
         assert (Lnu >= 0).all(), (Lnu)
         Llam = Lnu * freq**2 / c
         assert (Llam >= 0).all(), (Llam)
-        params = (M[Mv], a[av], Mdot[Mdotv], inc[0])
+        params = (Mv, av, Mdotv, inc[0])
         # normalise so that at 510nm, it is 1
         norm = np.interp(510.0, wave, Llam)
         assert norm > 0, (norm, wave, Llam)
@@ -708,20 +710,21 @@ def build_activate(base):
     
     # Mor Netzer torus template
     print("Importing Activate MorNetzer2012Torus ...")
-    data = np.genfromtxt(activate_dir + "agn/mor_netzer_2012/mor_netzer_2012_AGN_SED_combined_with_100K_grey_body")
-    wave = data[:,0] * 1000 # micron to nm
-    freq = c / wave
-    nuLnu = data[:,1] # is multiplied by frequency
-    assert wave[0] == 510.0, wave[0] # normalisation
-    Llam = nuLnu / freq * c / wave**2 
-    # normalise so that at 510nm, it is 1
-    norm = Llam[wave == 12000][0] # get normalisation at 12um
-    assert norm > 0, (norm, Llam)
-    Llam = Llam / norm
-    mask = wave > 1000 # model is valid above 1um
-    assert (Llam >= 0).all(), Llam
-    base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(wave[mask], Llam[mask]))
-    del Llam, mask, norm, wave
+    for filename, torustype in [('mor_netzer_mean_and_uncertainty', 'type-1'), ('fuller_mean', 'type-2')]:
+        data = np.genfromtxt(activate_dir + "agn/mor_netzer_2012/" + filename)
+        wave = data[:,0] * 1000 # micron to nm
+        freq = c / wave
+        nuLnu = data[:,1] # is multiplied by frequency
+        assert wave[0] == 510.0, wave[0] # normalisation
+        Llam = nuLnu / freq * c / wave**2 
+        # normalise so that at 510nm, it is 1
+        norm = Llam[wave == 12000][0] # get normalisation at 12um
+        assert norm > 0, (norm, Llam)
+        Llam = Llam / norm
+        mask = wave > 1000 # model is valid above 1um
+        assert (Llam >= 0).all(), Llam
+        base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(torustype, wave[mask], Llam[mask]))
+        del Llam, mask, norm, wave
 
     # FeII template
     print("Importing Activate FeIIferland ...")
