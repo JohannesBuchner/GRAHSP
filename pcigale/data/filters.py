@@ -66,9 +66,22 @@ class Filter(object):
         Normalise the transmission table to 1 and compute the effective
         wavelength of the filter.
         """
+        # normalise transmission to sum to unity
         self.trans_table[1] = self.trans_table[1] / (
             np.trapz(self.trans_table[1], self.trans_table[0]))
 
+        # calculation of the effective wavelength
         self.effective_wavelength = np.trapz(self.trans_table[1] *
                                              self.trans_table[0],
                                              self.trans_table[0])
+        
+        # correctly, we need the pivot wavelength for conversion
+        # equ. A16 in Bessel & Murphy 2012
+	S   = self.trans_table[1]
+	lam = self.trans_table[0]
+        nominator   = np.trapz(lam*S, x=lam)
+        denominator = np.trapz(S/lam, x=lam)
+        # we re-use the same field in cigale, but it is actually the 
+        # pivot wavelength
+        self.effective_wavelength = (nominator / denominator)**0.5
+        
