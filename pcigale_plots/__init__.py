@@ -173,7 +173,7 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
                                 sed['attenuation.stellar.young'][wsed] +
                                 sed['stellar.old'][wsed] +
                                 sed['attenuation.stellar.old'][wsed]),
-                               label="Stellar attenuated ", color='orange',
+                               label="Stellar attenuated E(B-V)=%.1f (+%.1f for AGN)" % (float(props['attenuation.ebv']), float(props.get('attenuation.ebv_agn', 0))), color='orange',
                                marker=None, nonposy='clip', linestyle='-',
                                linewidth=0.5)
                     ax1.loglog(wavelength_spec[wsed],
