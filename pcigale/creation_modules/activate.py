@@ -114,9 +114,6 @@ class Activate(CreationModule):
         
         #print("activate.processing with parameters:", self.parameters)
         # get existing normalisation at 5100A
-        luminosity = np.interp(510.0, sed.wavelength_grid, sed.luminosity)
-        assert luminosity >= 0, luminosity
-        
         sed.add_module(self.name, self.parameters)
         sed.add_info('agn.M', self.parameters["M"])
         sed.add_info('agn.a', self.parameters["a"])
@@ -128,14 +125,18 @@ class Activate(CreationModule):
 
         
         # Compute the AGN luminosity
-        if fracAGN < 1.:
+        if fracAGN < 0.:
+            l_agn = 1.
+        elif fracAGN < 1.:
+            luminosity = np.interp(510.0, sed.wavelength_grid, sed.luminosity)
+            assert luminosity >= 0, luminosity
             l_agn = luminosity * (1./(1.-fracAGN) - 1.)
         else:
             raise Exception("AGN fraction is exactly 1. Behaviour "
                             "undefined.")
         assert l_agn >= 0, l_agn
         
-        sed.add_info('agn.lum5100A', l_agn)
+        sed.add_info('agn.lum5100A', l_agn, True)
         #if agnType != 1:
         #	# truncate disk so that it does not produce UV emission
         #	# if type 2
@@ -154,7 +155,7 @@ class Activate(CreationModule):
         # l_agn is defined at 510nm, l_torus at 12um
         # because both are nu*L_nu = lam*L_lam normalisations, we need a
         l_torus = 2.5 * l_agn * fcov / 12.0 * 0.510
-        sed.add_info('agn.lum12um', l_torus)
+        sed.add_info('agn.lum12um', l_torus, True)
         sed.add_contribution('agn.activate_Torus', self.torus.wave,
                              l_torus * self.torus.lumin)
         #print(' torus', self.torus.wave, l_torus, self.torus.lumin)

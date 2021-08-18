@@ -81,6 +81,9 @@ class ActivateLines(CreationModule):
         # prev:
         # sed.add_contribution(name, wave, lumin)
         
+        # all widths are FWHM, so
+        # sigma = width / (2 * sqrt(2 * log(2)))
+        
         # we do not attempt to resolve the lines
         # so choose something very small here
         lines_width = 100 # km / s

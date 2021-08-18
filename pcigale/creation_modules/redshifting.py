@@ -20,7 +20,7 @@ is changed, this module may need to be adapted.
 
 import numpy as np
 from scipy.constants import parsec
-from scipy.misc import factorial
+from scipy.special import factorial
 
 from ..creation_modules import CreationModule
 from astropy.cosmology import WMAP7 as cosmology
@@ -117,7 +117,7 @@ def igm_transmission(wavelength, redshift):
     tau_l_lls = np.zeros_like(wavelength)
     tau_l_lls[w] = n0 * ((term1 - term2) * term3 - term4)
 
-    tau_taun = np.sum(tau_n[2:n_transitions_max, :], axis=0.)
+    tau_taun = np.sum(tau_n[2:n_transitions_max, :], axis=0)
 
     lambda_min_igm = (1+redshift)*70.
     w = np.where(wavelength < lambda_min_igm)
