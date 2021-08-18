@@ -100,7 +100,7 @@ class ParametersHandler(object):
         # index of an nD array. Thankfully numpy's unravel_index does the
         # conversion from a 1D index to nD indices.
         indices = np.unravel_index(index, self.shape)
-        params = [self.parameters[module][param_idx]
+        params = [self.parameters[module][int(param_idx)]
                   for module, param_idx in enumerate(indices)]
 
         return params
