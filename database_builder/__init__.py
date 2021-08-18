@@ -172,7 +172,7 @@ def build_filters(base):
 
 def build_cosmos_filters(base):
     filters_dir = os.path.join(os.path.dirname(__file__), 'filters/cosmos/')
-    for filter_file in glob.glob(filters_dir + '*.*'):
+    for filter_file in sorted(glob.glob(filters_dir + '*.*')):
         with open(filter_file, 'r') as filter_file_read:
             filter_name = 'cosmos/' + os.path.basename(filter_file)
             filter_type = 'energy'
@@ -676,13 +676,45 @@ def build_activate(base):
     del data, Llam, wave
     
     # Mor Netzer disk templates: M, Mdot, a
-    M = ["6.0", "7.0", "8.0", "9.0"]
-    a = ["0.998", "0"]
-    Mdot = ["0.3", "0.03"]
+    #M = ["6.0", "7.0", "8.0", "9.0"]
+    #a = ["0.998", "0"]
+    #Mdot = ["0.3", "0.03"]
     inc = ["0"]
     print("Importing Activate NetzerDisk ...")
     c = 3.0e18 # arbitrary units, we only care about the shape
     
+    # finer data table with spins
+    #header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21_header")
+    header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21_header")
+    logMBHs = header[:,0]
+    Mdots = header[:,1]
+    spins = header[:,5]
+    #data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21")[::-1]
+    data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21.gz")[::-1]
+    wave = data[:,1] * 0.1 # A -> nm
+    freq = data[:,0]
+    included = set()
+    for i, (Mv, av, Mdotv) in enumerate(zip(logMBHs, spins, Mdots)):
+        Lnu = data[:,2+i]
+        assert (Lnu >= 0).all(), (Lnu)
+        Llam = Lnu * freq**2 / c
+        assert (Llam >= 0).all(), (Llam)
+        params = (Mv, av, Mdotv, inc[0])
+        included.add(params)
+        # normalise so that at 510nm, it is 1
+        norm = np.interp(510.0, wave, Llam)
+        assert norm > 0, (norm, wave, Llam)
+        Llam = Llam / norm
+        assert (Llam >= 0).all(), (Llam, norm)
+        assert np.isfinite(Llam).all(), (Llam, norm)
+        assert np.isfinite(wave).all(), (wave)
+        print("norm:", norm, " for ", params)
+        if i == 0:
+            print("    ", wave, Llam)
+        base.add_ActivateNetzerDisk(NetzerDisk(params[0], params[1], params[2],
+                                         params[3], wave, Llam))
+    
+    """
     datafile = open(activate_dir + "agn/mor_netzer_2012/table_of_disk_models")
     data = "".join(datafile.readlines()[23:][::-1]) # reverse
     datafile.close()
@@ -697,6 +729,9 @@ def build_activate(base):
         Llam = Lnu * freq**2 / c
         assert (Llam >= 0).all(), (Llam)
         params = (Mv, av, Mdotv, inc[0])
+        if params in included:
+            continue
+        included.add(params)
         # normalise so that at 510nm, it is 1
         norm = np.interp(510.0, wave, Llam)
         assert norm > 0, (norm, wave, Llam)
@@ -707,6 +742,7 @@ def build_activate(base):
                                          params[3], wave, Llam))
         del Llam, Lnu
     del wave
+    """
     
     # Mor Netzer torus template
     print("Importing Activate MorNetzer2012Torus ...")
@@ -739,11 +775,15 @@ def build_activate(base):
     assert wave.shape == Llam.shape, (wave.shape, Llam.shape)
     assert (Llam >= 0).all(), Llam
     # normalisation at FeII 4575
-    norm = np.max(Llam[wavez == 4593.4])
+    norm1 = np.max(Llam[wavez == 4593.4])
     #norm = np.interp(457.5, wave, Llam)
+    # normalisation over entire wavelength
+    norm = np.trapz(Llam, x=wave*0.1)
+    norm = norm1
     assert norm > 0, (norm, Llam)
     Llam = Llam / norm
-    print('    largest luminosity after normalising:', np.max(Llam))
+    #print('    largest luminosity after normalising:', np.max(Llam))
+    print('    FeII normalisation:', norm, norm1/norm)
     assert norm == 8.30E+06 * c / 4593.4**2, (norm, 8.30E+06 * c / 4593.4**2, np.max(Llam))
     assert wave.shape == Llam.shape, (wave.shape, Llam.shape)
     base.add_ActivateFeIIferland(FeIIferland(wave * 0.1, Llam))
