@@ -920,7 +920,7 @@ class Database(object):
                              result.inc, result.wave, result.lumin)
         else:
             raise DatabaseLookupError(
-                "The NetzerDisk model is not in the database.")
+                "The NetzerDisk model is not in the database: %s" % (M, a, Mdot, inc))
 
     def get_ActivateNetzerDisk_parameters(self):
         """Get parameters for Netzer disk models.
