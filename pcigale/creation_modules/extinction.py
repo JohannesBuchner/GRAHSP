@@ -52,6 +52,8 @@ class ExtinctionLaw(CreationModule):
             "V_B90 & FUV"
         ))
     ])
+    store_filter_attenuation = False
+    store_component_attenuation = False
 
     def _init_code(self):
         # We cannot compute the attenuation until we know the wavelengths. Yet,
@@ -80,8 +82,9 @@ class ExtinctionLaw(CreationModule):
         
         wavelength = sed.wavelength_grid
 
-        # Fλ fluxes (only from continuum) in each filter before attenuation.
-        flux_noatt = {filt: sed.compute_fnu(filt) for filt in self.filter_list}
+        if self.store_filter_attenuation:
+            # Fλ fluxes (only from continuum) in each filter before attenuation.
+            flux_noatt = {filt: sed.compute_fnu(filt) for filt in self.filter_list}
 
         # Compute attenuation curve
         if self.sel_attenuation is None or self.sel_attenuation.shape != wavelength.shape:
@@ -89,6 +92,8 @@ class ExtinctionLaw(CreationModule):
             self.sel_attenuation[wavelength < 60] = 100
 
         attenuation_total = 0.
+        attenuation_total_total = 0.
+        sed.add_module(self.name, self.parameters)
         for contrib in list(sed.contribution_names):
             luminosity = sed.get_lumin_contribution(contrib)
             e_bv_this = e_bv
@@ -97,32 +102,39 @@ class ExtinctionLaw(CreationModule):
             attenuated_luminosity = (luminosity * 10 **
                                      (e_bv_this * self.sel_attenuation / -2.5))
             attenuation_spectrum = attenuated_luminosity - luminosity
-            # We integrate the amount of luminosity attenuated (-1 because the
-            # spectrum is negative).
-            attenuation = -1 * np.trapz(attenuation_spectrum, wavelength)
-            attenuation_total += attenuation
+            attenuation_total_total += attenuation_spectrum
+            if self.store_component_attenuation:
+                # We integrate the amount of luminosity attenuated (-1 because the
+                # spectrum is negative).
+                attenuation = -1 * np.trapz(attenuation_spectrum, wavelength)
+                attenuation_total += attenuation
 
-            sed.add_module(self.name, self.parameters)
-            #sed.add_info("attenuation.E_BVs." + contrib, e_bv)
-            #sed.add_info("attenuation." + contrib, attenuation, True)
-            sed.add_contribution("attenuation." + contrib, wavelength,
-                                 attenuation_spectrum)
+                #sed.add_info("attenuation.E_BVs." + contrib, e_bv)
+                #sed.add_info("attenuation." + contrib, attenuation, True)
+                sed.add_contribution("attenuation." + contrib, wavelength,
+                                     attenuation_spectrum)
+        if not self.store_component_attenuation:
+            sed.add_contribution("attenuation.total", wavelength,
+                                 attenuation_total_total)
 
-        # Total attenuation
-        if 'dust.luminosity' in sed.info:
-            sed.add_info("dust.luminosity",
-                         sed.info["dust.luminosity"]+attenuation_total, True,
-                         True)
-        else:
-            sed.add_info("dust.luminosity", attenuation_total, True)
+        if self.store_component_attenuation:
+            # Total attenuation
+            if 'dust.luminosity' in sed.info:
+                sed.add_info("dust.luminosity",
+                             sed.info["dust.luminosity"] + attenuation_total, True,
+                             True)
+            else:
+                sed.add_info("dust.luminosity", attenuation_total, True)
 
-        # Fλ fluxes (only from continuum) in each filter after attenuation.
-        flux_att = {filt: sed.compute_fnu(filt) for filt in self.filter_list}
+        if self.store_filter_attenuation:
+            # Fλ fluxes (only from continuum) in each filter after attenuation.
+            flux_att = {filt: sed.compute_fnu(filt) for filt in self.filter_list}
 
-        # Attenuation in each filter
-        for filt in self.filter_list:
-            sed.add_info("attenuation." + filt,
-                         -2.5 * np.log10(flux_att[filt] / flux_noatt[filt]))
+            # Attenuation in each filter
+            with np.errstate(invalid='ignore'):
+                for filt in self.filter_list:
+                    sed.add_info("attenuation." + filt,
+                                 -2.5 * np.log10(flux_att[filt] / flux_noatt[filt]))
 
         sed.add_info('attenuation.ebv', e_bv)
         sed.add_info('attenuation.ebv_agn', e_bv_agn)

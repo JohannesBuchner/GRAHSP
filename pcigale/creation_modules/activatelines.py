@@ -38,7 +38,25 @@ class ActivateLines(CreationModule):
             assert (self.emLines.lumin_BLAGN >= 0).all()
             assert (self.emLines.lumin_Sy2 >= 0).all()
             assert (self.emLines.lumin_LINER >= 0).all()
-            
+
+
+        # all widths are FWHM, so
+        # sigma = width / (2 * sqrt(2 * log(2)))
+        
+        # we do not attempt to resolve the lines
+        # so choose something very small here
+        lines_width = 100 # km / s
+        new_wave = np.array([])
+        for line_wave in self.emLines.wave:
+            # get line width in nm
+            width = line_wave * (lines_width * 1000) / cst.c
+            new_wave = np.concatenate(
+                (new_wave,
+                 np.linspace(line_wave - 3. * width,
+                             line_wave + 3. * width,
+                             9)))
+        new_wave.sort()
+        self.new_wave = new_wave
 
     def process(self, sed):
         """Add the AGN contributions
@@ -72,9 +90,11 @@ class ActivateLines(CreationModule):
         elif agnType == 2: # Sy2
             self.add_lines(sed, 'agn.activate_EmLines_NL', self.emLines.wave,
                                  l_narrowlines * self.emLines.lumin_Sy2)
+            sed.add_contribution('agn.activate_FeLines', self.fe2.wave, 0 * self.fe2.lumin)
         elif agnType == 3: # LINER
             self.add_lines(sed, 'agn.activate_EmLines_LINER', self.emLines.wave,
                                  l_narrowlines * self.emLines.lumin_LINER)
+            sed.add_contribution('agn.activate_FeLines', self.fe2.wave, 0 * self.fe2.lumin)
     
     def add_lines(self, sed, name, wave, lumin):
         """ make small gaussian lines out of the delta function information """
@@ -86,18 +106,10 @@ class ActivateLines(CreationModule):
         
         # we do not attempt to resolve the lines
         # so choose something very small here
-        lines_width = 100 # km / s
-        new_wave = np.array([])
-        for line_wave, line_lumin in zip(wave, lumin):
-            # get line width in nm
-            width = line_wave * (lines_width * 1000) / cst.c
-            new_wave = np.concatenate((new_wave,
-                                           np.linspace(line_wave - 3. * width,
-                                                       line_wave + 3. * width,
-                                                       9)))
-        new_wave.sort()
+        new_wave = self.new_wave
         new_lumin = np.zeros_like(new_wave)
         for line_flux, line_wave in zip(lumin, wave):
+            lines_width = 100 # km / s
             width = line_wave * (lines_width * 1000) / cst.c
             new_lumin += (line_flux * np.exp(- 4. * np.log(2.) *
                         (new_wave - line_wave) ** 2. / (width * width)) /

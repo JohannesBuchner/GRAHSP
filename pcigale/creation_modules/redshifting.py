@@ -25,7 +25,10 @@ from scipy.special import factorial
 from ..creation_modules import CreationModule
 from astropy.cosmology import WMAP7 as cosmology
 
+import joblib
+mem = joblib.Memory('.', verbose=False)
 
+@mem.cache
 def igm_transmission(wavelength, redshift):
     """Intergalactic transmission (Meiksin, 2006)
 
