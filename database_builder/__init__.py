@@ -137,10 +137,11 @@ def read_bc03_ssp(filename):
     # we remove t=0 from the SSP.
     return time_grid[1:], wavelength, luminosity[:, 1:]
 
+from  pcigale.data import DatabaseInsertError
 
 def build_filters(base):
     filters_dir = os.path.join(os.path.dirname(__file__), 'filters/')
-    for filter_file in glob.glob(filters_dir + '*.dat'):
+    for filter_file in sorted(glob.glob(filters_dir + '*.dat')) + sorted(glob.glob(filters_dir + 'gazpar/**/*.pb', recursive=True)):
         with open(filter_file, 'r') as filter_file_read:
             filter_name = filter_file_read.readline().strip('# \n\t')
             filter_type = filter_file_read.readline().strip('# \n\t')
@@ -168,7 +169,10 @@ def build_filters(base):
                 filter_table[0][filter_table[1] > 0]
             )
 
-        base.add_filter(new_filter)
+        try:
+            base.add_filter(new_filter)
+        except DatabaseInsertError:
+            print("WARNING: could not insert filter %s, already loaded." % filter_file)
 
 def build_cosmos_filters(base):
     filters_dir = os.path.join(os.path.dirname(__file__), 'filters/cosmos/')
@@ -683,14 +687,15 @@ def build_activate(base):
     print("Importing Activate NetzerDisk ...")
     c = 3.0e18 # arbitrary units, we only care about the shape
     
+    """
     # finer data table with spins
-    #header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21_header")
-    header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21_header")
+    header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21_header")
+    #header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21_header")
     logMBHs = header[:,0]
     Mdots = header[:,1]
     spins = header[:,5]
-    #data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21")[::-1]
-    data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21.gz")[::-1]
+    data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21")[::-1]
+    #data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21.gz")[::-1]
     wave = data[:,1] * 0.1 # A -> nm
     freq = data[:,0]
     included = set()
@@ -708,19 +713,24 @@ def build_activate(base):
         assert (Llam >= 0).all(), (Llam, norm)
         assert np.isfinite(Llam).all(), (Llam, norm)
         assert np.isfinite(wave).all(), (wave)
-        print("norm:", norm, " for ", params)
-        if i == 0:
-            print("    ", wave, Llam)
+        # print("norm:", norm, " for ", params)
+        #if i == 0:
+        #    print("    ", wave, Llam)
         base.add_ActivateNetzerDisk(NetzerDisk(params[0], params[1], params[2],
                                          params[3], wave, Llam))
-    
     """
+    
+    M = ["6.0", "7.0", "8.0", "9.0"]
+    a = ["0.998", "0"]
+    Mdot = ["0.3", "0.03"]
+    inc = ["0"]
     datafile = open(activate_dir + "agn/mor_netzer_2012/table_of_disk_models")
     data = "".join(datafile.readlines()[23:][::-1]) # reverse
     datafile.close()
     data = np.genfromtxt(io.BytesIO(data.encode()))
     wave = data[:,1] * 0.1 # A -> nm
     freq = data[:,0]
+    included = set()
     #for i, (Mv, av, Mdotv) in enumerate([(0,1,1),(0,1,0),(0,0,0),(0,0,1),(1,1,1),(1,1,0),(1,0,0),(1,0,1)]):
     options = [(Mv, av, Mdotv) for av in a for Mdotv in Mdot for Mv in M]
     for i, (Mv, av, Mdotv) in enumerate(options):
@@ -742,26 +752,67 @@ def build_activate(base):
                                          params[3], wave, Llam))
         del Llam, Lnu
     del wave
-    """
     
     # Mor Netzer torus template
     print("Importing Activate MorNetzer2012Torus ...")
-    for filename, torustype in [('mor_netzer_mean_and_uncertainty', 'type-1'), ('fuller_mean', 'type-2')]:
+    for filename, torustype, col in [
+        ('mor_netzer_mean_and_uncertainty', 'mor-avg', 1),
+        ('mor_netzer_mean_and_uncertainty', 'mor-lo', 2),
+        ('mor_netzer_mean_and_uncertainty', 'mor-hi', 3),
+        # ('fuller_mean', 'type-2', 1, True)]:
+    ]: 
         data = np.genfromtxt(activate_dir + "agn/mor_netzer_2012/" + filename)
         wave = data[:,0] * 1000 # micron to nm
         freq = c / wave
-        nuLnu = data[:,1] # is multiplied by frequency
+        nuLnu = data[:,col] # is multiplied by frequency
+        
         assert wave[0] == 510.0, wave[0] # normalisation
         Llam = nuLnu / freq * c / wave**2 
-        # normalise so that at 510nm, it is 1
+        # normalise so that at 12um, it is 1
         norm = Llam[wave == 12000][0] # get normalisation at 12um
         assert norm > 0, (norm, Llam)
         Llam = Llam / norm
         mask = wave > 1000 # model is valid above 1um
+        # extrapolate with the shortest wavelength data points 
+        # using to a power law to even shorter wavelengths.
+        i = np.where(mask)[0][0]
+        Llam[~mask] = Llam[i] * 10**(np.log10(Llam[i+1] / Llam[i]) * np.log10(wave[~mask] / wave[i]) / np.log10(wave[i+1] / wave[i]))
         assert (Llam >= 0).all(), Llam
-        base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(torustype, wave[mask], Llam[mask]))
+        base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(torustype, wave, Llam))
         del Llam, mask, norm, wave
 
+
+    # Mullaney templates show a slight difference between high and low luminosity
+    # in the Silicate feature depth
+    # so we isolate the Si feature here:
+    data = np.genfromtxt(activate_dir + "agn/mor_netzer_2012/othermodels/Mullaney.txt")
+    wave = data[:,0] * 1000 # micron to nm
+    freq = c / wave
+    # make the two spectra equal at 18000:
+    i = np.where(wave > 18000)[0][0]
+    specA = data[:,2]
+    specB = data[:,3] * (data[i,2] / data[i,3])
+    nuLnu = (specA + specB) / 2.
+    nuLnu *= freq
+    Llam = nuLnu / freq * c / wave**2 
+    # get continuum normalisation at 12um
+    norm = Llam[wave == 12000][0]
+    
+    # get difference spectrum:
+    # normalise the two templates at 18um, just before the infrared bump
+    # this is approximately 98%.
+    nuLnu = specA - specB
+    # remove stuff outside the Si waveband
+    nuLnu[np.logical_and(nuLnu < 0, wave < 8000)] = 0.0
+    nuLnu[np.logical_and(nuLnu < 0, wave > 18000)] = 0.0
+    nuLnu *= freq
+    Llam = nuLnu / freq * c / wave**2 
+    mask = np.logical_and(wave > 7000, wave < 19000)
+    base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus('mullaney-silicate', wave[mask], Llam[mask] / norm))
+    del Llam, mask, norm, wave
+
+    
+    
     # FeII template
     print("Importing Activate FeIIferland ...")
     data = np.genfromtxt(activate_dir + "agn/FeII_template/Fe_d11-m20-20.5.txt")
@@ -861,7 +912,7 @@ def build_nebular(base):
         base.add_nebular_continuum(cont)
 
 
-def build_base():
+def build_base_full():
     base = Database(writable=True)
     base.upgrade_base()
     
@@ -914,13 +965,13 @@ def build_base():
 
     base.session.close_all()
 
-def build_base():
+def build_base_quick():
     base = Database(writable=True)
     base.upgrade_base()
     
     print('#' * 78)
     print("1- Importing filters...\n")
-    build_cosmos_filters(base)
+    #build_cosmos_filters(base)
     build_filters(base)
     print("\nDONE\n")
     print('#' * 78)
@@ -941,6 +992,11 @@ def build_base():
     print('#' * 78)
     
     base.session.close_all()
+
+if os.environ.get('QUICK', '1') == '1':
+    build_base = build_base_quick
+else:
+    build_base = build_base_full
 
 if __name__ == '__main__':
     build_base()
