@@ -1,0 +1,9 @@
+# linefilter.H-alpha-100
+# energy
+# H-alpha pseudo filter, R=100. The flux will not be corrected for any absorption line. Make sure the continuum part is not affected by emission lines. Feel free to adapt the filter if the resolution is not adequate.
+6497.370000 -1.0
+6530.185000 -1.0
+6530.185001  1.0
+6595.814999  1.0
+6595.815000 -1.0
+6628.630000 -1.0

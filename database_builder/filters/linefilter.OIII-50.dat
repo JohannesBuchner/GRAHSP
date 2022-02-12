@@ -1,0 +1,9 @@
+# linefilter.OIII-50
+# energy
+# OIII pseudo filter, R=50. The flux will not be corrected for any absorption line. Make sure the continuum part is not affected by emission lines. Feel free to adapt the filter if the resolution is not adequate.
+4883.340000 -1.0
+4933.170000 -1.0
+4933.170001  1.0
+5032.829999  1.0
+5032.830000 -1.0
+5082.660000 -1.0
