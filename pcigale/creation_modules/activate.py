@@ -54,7 +54,7 @@ class Activate(CreationModule):
         )),
         ('fcov', (
             'float',
-            "Torus Covering fraction.",
+            "Torus Covering fraction. 0.1 to 0.7 is recommended.",
             0.1
         )),
         ('AFeII', (
@@ -71,6 +71,16 @@ class Activate(CreationModule):
             'float',
             "AGN fraction at 510nm.",
             0.1
+        )),
+        ('Si', (
+            'float',
+            "Strength of the 12um Silicate feature (relative to the difference in Mullaney+11). -3 to 3 is reasonable.",
+            0.
+        )),
+        ('TORtemp', (
+            'float',
+            "Steepness of the torus spectrum (relative to the spread in Mor&Netzer+09). -3 to 3 is reasonable.",
+            0.
         ))
     ])
 
@@ -80,15 +90,19 @@ class Activate(CreationModule):
         a = self.parameters["a"]
         Mdot = self.parameters["Mdot"]
         inc = self.parameters["inc"]
-        agnType = self.parameters["AGNtype"]
+        # agnType = self.parameters["AGNtype"]
         # for LINERs, we still use a type-2 template
-        torustype = {1:'type-1', 2:'type-2', 3:'type-2'}[agnType]
 
         with Database() as base:
             self.disk = base.get_ActivateNetzerDisk(M, a, Mdot, inc)
             assert (self.disk.lumin >= 0).all()
-            self.torus = base.get_ActivateMorNetzer2012Torus(torustype)
-            assert (self.torus.lumin >= 0).all()
+            # load average torus model spectrum
+            self.torus_avg = base.get_ActivateMorNetzer2012Torus('mor-avg')
+            self.torus_lo = base.get_ActivateMorNetzer2012Torus('mor-lo')
+            self.torus_hi = base.get_ActivateMorNetzer2012Torus('mor-hi')
+            assert (self.torus_avg.lumin >= 0).all()
+            # load silicate feature model spectrum
+            self.si = base.get_ActivateMorNetzer2012Torus('mullaney-silicate')
             self.fe2 = base.get_ActivateFeIIferland()
             assert self.fe2.wave.shape == self.fe2.lumin.shape, (self.fe2.wave.shape, self.fe2.lumin.shape)
             assert (self.fe2.lumin >= 0).all()
@@ -110,7 +124,9 @@ class Activate(CreationModule):
 
         fracAGN = self.parameters["fracAGN"]
         fcov = self.parameters["fcov"]
-        agnType = self.parameters["AGNtype"]
+        # agnType = self.parameters["AGNtype"]
+        Si = self.parameters["Si"]
+        TORtemp = self.parameters["TORtemp"]
         
         #print("activate.processing with parameters:", self.parameters)
         # get existing normalisation at 5100A
@@ -122,6 +138,8 @@ class Activate(CreationModule):
         sed.add_info('agn.fcov', self.parameters["fcov"])
         sed.add_info('agn.type', self.parameters["AGNtype"])
         sed.add_info('agn.fracAGN', self.parameters["fracAGN"])
+        sed.add_info('agn.Si', self.parameters["Si"])
+        sed.add_info('agn.TORtemp', self.parameters["TORtemp"])
 
         
         # Compute the AGN luminosity
@@ -156,9 +174,15 @@ class Activate(CreationModule):
         # because both are nu*L_nu = lam*L_lam normalisations, we need a
         l_torus = 2.5 * l_agn * fcov / 12.0 * 0.510
         sed.add_info('agn.lum12um', l_torus, True)
-        sed.add_contribution('agn.activate_Torus', self.torus.wave,
-                             l_torus * self.torus.lumin)
-        #print(' torus', self.torus.wave, l_torus, self.torus.lumin)
+        if TORtemp > 0:
+            torus_deviation = (self.torus_hi.lumin - self.torus_avg.lumin) * TORtemp
+        else:
+            torus_deviation = (self.torus_lo.lumin - self.torus_avg.lumin) * -TORtemp
+
+        sed.add_contribution('agn.activate_Torus', self.torus_avg.wave,
+                             l_torus * (self.torus_avg.lumin + torus_deviation))
+        sed.add_contribution('agn.activate_TorusSi', self.si.wave,
+                             l_torus * self.si.lumin * Si)
 
 # CreationModule to be returned by get_module
 Module = Activate
