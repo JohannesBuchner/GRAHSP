@@ -772,13 +772,14 @@ def build_activate(base):
         norm = Llam[wave == 12000][0] # get normalisation at 12um
         assert norm > 0, (norm, Llam)
         Llam = Llam / norm
-        # get value at 2um
-        lonorm = np.interp(2000, wave, Llam)
-        # extrapolate to lower wavelengths with a powerlaw of index 1
-        Llam[wave < 2000] = lonorm * (wave[wave < 2000] / 2000.)
+        mask = wave > 1000 # model is valid above 1um
+        # extrapolate with the shortest wavelength data points 
+        # using to a power law to even shorter wavelengths.
+        i = np.where(mask)[0][0]
+        Llam[~mask] = Llam[i] * 10**(np.log10(Llam[i+1] / Llam[i]) * np.log10(wave[~mask] / wave[i]) / np.log10(wave[i+1] / wave[i]))
         assert (Llam >= 0).all(), Llam
         base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(torustype, wave, Llam))
-        del Llam, norm, wave
+        del Llam, mask, norm, wave
 
 
     # Mullaney templates show a slight difference between high and low luminosity
