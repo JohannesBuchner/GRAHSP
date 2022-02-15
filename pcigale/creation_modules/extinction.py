@@ -52,8 +52,8 @@ class ExtinctionLaw(CreationModule):
             "V_B90 & FUV"
         ))
     ])
-    store_filter_attenuation = False
-    store_component_attenuation = False
+    store_filter_attenuation = True
+    store_component_attenuation = True
 
     def _init_code(self):
         # We cannot compute the attenuation until we know the wavelengths. Yet,
