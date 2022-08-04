@@ -647,7 +647,7 @@ def build_fritz2006(base):
                                          lumin_therm, lumin_scatt, lumin_agn))
 
 
-def build_activate(base):
+def build_activate(base, fine_netzer_disk=False, all_spins=False):
     activate_dir = os.path.join(os.path.dirname(__file__), 'activate/')
 
     # conversion from Fnu to Flam:
@@ -687,71 +687,73 @@ def build_activate(base):
     print("Importing Activate NetzerDisk ...")
     c = 3.0e18 # arbitrary units, we only care about the shape
     
-    """
-    # finer data table with spins
-    header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21_header")
-    #header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21_header")
-    logMBHs = header[:,0]
-    Mdots = header[:,1]
-    spins = header[:,5]
-    data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21")[::-1]
-    #data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21.gz")[::-1]
-    wave = data[:,1] * 0.1 # A -> nm
-    freq = data[:,0]
     included = set()
-    for i, (Mv, av, Mdotv) in enumerate(zip(logMBHs, spins, Mdots)):
-        Lnu = data[:,2+i]
-        assert (Lnu >= 0).all(), (Lnu)
-        Llam = Lnu * freq**2 / c
-        assert (Llam >= 0).all(), (Llam)
-        params = (Mv, av, Mdotv, inc[0])
-        included.add(params)
-        # normalise so that at 510nm, it is 1
-        norm = np.interp(510.0, wave, Llam)
-        assert norm > 0, (norm, wave, Llam)
-        Llam = Llam / norm
-        assert (Llam >= 0).all(), (Llam, norm)
-        assert np.isfinite(Llam).all(), (Llam, norm)
-        assert np.isfinite(wave).all(), (wave)
-        # print("norm:", norm, " for ", params)
-        #if i == 0:
-        #    print("    ", wave, Llam)
-        base.add_ActivateNetzerDisk(NetzerDisk(params[0], params[1], params[2],
-                                         params[3], wave, Llam))
-    """
-    
-    M = ["6.0", "7.0", "8.0", "9.0"]
-    a = ["0.998", "0"]
-    Mdot = ["0.3", "0.03"]
-    inc = ["0"]
-    datafile = open(activate_dir + "agn/mor_netzer_2012/table_of_disk_models")
-    data = "".join(datafile.readlines()[23:][::-1]) # reverse
-    datafile.close()
-    data = np.genfromtxt(io.BytesIO(data.encode()))
-    wave = data[:,1] * 0.1 # A -> nm
-    freq = data[:,0]
-    included = set()
-    #for i, (Mv, av, Mdotv) in enumerate([(0,1,1),(0,1,0),(0,0,0),(0,0,1),(1,1,1),(1,1,0),(1,0,0),(1,0,1)]):
-    options = [(Mv, av, Mdotv) for av in a for Mdotv in Mdot for Mv in M]
-    for i, (Mv, av, Mdotv) in enumerate(options):
-        Lnu = data[:,2+i]
-        assert (Lnu >= 0).all(), (Lnu)
-        Llam = Lnu * freq**2 / c
-        assert (Llam >= 0).all(), (Llam)
-        params = (Mv, av, Mdotv, inc[0])
-        if params in included:
-            continue
-        included.add(params)
-        # normalise so that at 510nm, it is 1
-        norm = np.interp(510.0, wave, Llam)
-        assert norm > 0, (norm, wave, Llam)
-        Llam = Llam / norm
-        assert (Llam >= 0).all(), (Llam, norm)
-        print("norm:", norm, " for ", params)
-        base.add_ActivateNetzerDisk(NetzerDisk(params[0], params[1], params[2],
-                                         params[3], wave, Llam))
-        del Llam, Lnu
-    del wave
+    if fine_netzer_disk:
+        # finer data table with spins
+        header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21_header")
+        #header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21_header")
+        logMBHs = header[:,0]
+        Mdots = header[:,1]
+        spins = header[:,5]
+        data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21")[::-1]
+        #data = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21.gz")[::-1]
+        wave = data[:,1] * 0.1 # A -> nm
+        freq = data[:,0]
+        for i, (Mv, av, Mdotv) in enumerate(zip(logMBHs, spins, Mdots)):
+            if av not in (0, 0.7) and not all_spins:
+                print("skipping spin", av)
+                continue
+            Lnu = data[:,2+i]
+            assert (Lnu >= 0).all(), (Lnu)
+            Llam = Lnu * freq**2 / c
+            assert (Llam >= 0).all(), (Llam)
+            params = (str(Mv), str(av), str(Mdotv), inc[0])
+            included.add(params)
+            # normalise so that at 510nm, it is 1
+            norm = np.interp(510.0, wave, Llam)
+            assert norm > 0, (norm, wave, Llam)
+            Llam = Llam / norm
+            assert (Llam >= 0).all(), (Llam, norm)
+            assert np.isfinite(Llam).all(), (Llam, norm)
+            assert np.isfinite(wave).all(), (wave)
+            print("  ", params)
+            #if i == 0:
+            #    print("    ", wave, Llam)
+            base.add_ActivateNetzerDisk(NetzerDisk(params[0], params[1], params[2],
+                                             params[3], wave, Llam))
+    else:
+        M = ["6.0", "7.0", "8.0", "9.0"]
+        a = ["0.998", "0"]
+        Mdot = ["0.3", "0.03"]
+        inc = ["0"]
+        datafile = open(activate_dir + "agn/mor_netzer_2012/table_of_disk_models")
+        data = "".join(datafile.readlines()[23:][::-1]) # reverse
+        datafile.close()
+        data = np.genfromtxt(io.BytesIO(data.encode()))
+        wave = data[:,1] * 0.1 # A -> nm
+        freq = data[:,0]
+        #included = set()
+        #for i, (Mv, av, Mdotv) in enumerate([(0,1,1),(0,1,0),(0,0,0),(0,0,1),(1,1,1),(1,1,0),(1,0,0),(1,0,1)]):
+        options = [(Mv, av, Mdotv) for av in a for Mdotv in Mdot for Mv in M]
+        for i, (Mv, av, Mdotv) in enumerate(options):
+            Lnu = data[:,2+i]
+            assert (Lnu >= 0).all(), (Lnu)
+            Llam = Lnu * freq**2 / c
+            assert (Llam >= 0).all(), (Llam)
+            params = (Mv, av, Mdotv, inc[0])
+            if params in included:
+                continue
+            included.add(params)
+            # normalise so that at 510nm, it is 1
+            norm = np.interp(510.0, wave, Llam)
+            assert norm > 0, (norm, wave, Llam)
+            Llam = Llam / norm
+            assert (Llam >= 0).all(), (Llam, norm)
+            print("  ", params)
+            base.add_ActivateNetzerDisk(NetzerDisk(params[0], params[1], params[2],
+                                             params[3], wave, Llam))
+            del Llam, Lnu
+    del wave, freq
     
     # Mor Netzer torus template
     print("Importing Activate MorNetzer2012Torus ...")
@@ -944,7 +946,7 @@ def build_base_full():
     print('#' * 78)
 
     print("6- Importing Activate models\n")
-    build_activate(base)
+    build_activate(base, fine_netzer_disk=True, all_spins=True)
     print("\nDONE\n")
     print('#' * 78)
     
@@ -982,7 +984,12 @@ def build_base_quick():
     print('#' * 78)
 
     print("6- Importing Activate models\n")
-    build_activate(base)
+    build_activate(base, fine_netzer_disk=True, all_spins=False)
+    print("\nDONE\n")
+    print('#' * 78)
+
+    print("7- Importing Dale et al (2014) templates\n")
+    build_dale2014(base)
     print("\nDONE\n")
     print('#' * 78)
 
