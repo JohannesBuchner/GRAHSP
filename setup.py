@@ -18,12 +18,12 @@ class custom_build(build):
         build.run(self)
 
 entry_points = {
-    'console_scripts': ['pcigale = pcigale:main',
-                        'pcigale-plots = pcigale_plots:main']
+    'console_scripts': ['pcigale-grasp = pcigale:main',
+                        'pcigale-grasp-plots = pcigale_plots:main']
 }
 
 setup(
-    name="pcigale",
+    name="grahsp",
     version="0.6.0",
     packages=find_packages(exclude=["database_builder"]),
 
@@ -36,9 +36,9 @@ setup(
     package_data={'pcigale': ['data/data.db'],
                   'pcigale_plots': ['data/CIGALE.png']},
 
-    author="The CIGALE team",
-    author_email="cigale@lam.fr",
-    description="Python Code Investigating Galaxy Emission",
+    author="Johannes Buchner, The CIGALE team",
+    author_email="johannes.buchner.acad@gmx.com",
+    description="Grasping reliably the AGN host stellar population",
     license="CeCILL-V2",
-    keywords="astrophysics, galaxy, SED fitting"
+    keywords="astrophysics, galaxy, SED fitting, quasars"
 )
