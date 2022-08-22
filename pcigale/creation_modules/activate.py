@@ -47,16 +47,18 @@ class Activate(CreationModule):
         # Compute the AGN luminosity
         if fracAGN < 0.:
             l_agn = 1.
+            scales_with_mass = False
         elif fracAGN < 1.:
             luminosity = np.interp(510.0, sed.wavelength_grid, sed.luminosity)
             assert luminosity >= 0, luminosity
             l_agn = luminosity * (1./(1.-fracAGN) - 1.)
+            scales_with_mass = True
         else:
             raise Exception("AGN fraction is exactly 1. Behaviour "
                             "undefined.")
         assert l_agn >= 0, l_agn
         
-        sed.add_info('agn.lum5100A', l_agn, True)
+        sed.add_info('agn.lum5100A', l_agn, scales_with_mass)
 
 # CreationModule to be returned by get_module
 Module = Activate
