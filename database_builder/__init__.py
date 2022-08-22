@@ -700,7 +700,7 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
         wave = data[:,1] * 0.1 # A -> nm
         freq = data[:,0]
         for i, (Mv, av, Mdotv) in enumerate(zip(logMBHs, spins, Mdots)):
-            if av not in (0, 0.7) and not all_spins:
+            if av not in (0, 0.7, 0.998, -1) and not all_spins:
                 print("skipping spin", av)
                 continue
             Lnu = data[:,2+i]
@@ -758,9 +758,9 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
     # Mor Netzer torus template
     print("Importing Activate MorNetzer2012Torus ...")
     for filename, torustype, col in [
-        ('mor_netzer_mean_and_uncertainty', 'mor-avg', 1),
-        ('mor_netzer_mean_and_uncertainty', 'mor-lo', 2),
-        ('mor_netzer_mean_and_uncertainty', 'mor-hi', 3),
+        ('mor_netzer_mean_and_uncertainty_extended', 'mor-avg', 1),
+        ('mor_netzer_mean_and_uncertainty_extended', 'mor-lo', 2),
+        ('mor_netzer_mean_and_uncertainty_extended', 'mor-hi', 3),
         # ('fuller_mean', 'type-2', 1, True)]:
     ]: 
         data = np.genfromtxt(activate_dir + "agn/mor_netzer_2012/" + filename)
@@ -768,7 +768,7 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
         freq = c / wave
         nuLnu = data[:,col] # is multiplied by frequency
         
-        assert wave[0] == 510.0, wave[0] # normalisation
+        #assert wave[0] == 510.0, wave[0] # normalisation
         Llam = nuLnu / freq * c / wave**2 
         # normalise so that at 12um, it is 1
         norm = Llam[wave == 12000][0] # get normalisation at 12um
@@ -778,7 +778,10 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
         # extrapolate with the shortest wavelength data points 
         # using to a power law to even shorter wavelengths.
         i = np.where(mask)[0][0]
-        Llam[~mask] = Llam[i] * 10**(np.log10(Llam[i+1] / Llam[i]) * np.log10(wave[~mask] / wave[i]) / np.log10(wave[i+1] / wave[i]))
+        polycoef = np.polyfit(np.log10(wave[i:i+4]), np.log10(Llam[i:i+4]), 2)
+        poly = np.poly1d(polycoef)
+        #Llam[~mask] = Llam[i] * 10**(np.log10(Llam[i+1] / Llam[i]) * np.log10(wave[~mask] / wave[i]) / np.log10(wave[i+1] / wave[i]))
+        Llam[~mask] = 10**poly(np.log10(wave[~mask]))
         assert (Llam >= 0).all(), Llam
         base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(torustype, wave, Llam))
         del Llam, mask, norm, wave

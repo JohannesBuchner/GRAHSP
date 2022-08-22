@@ -26,6 +26,11 @@ class ActivateLines(CreationModule):
             "Strength of FeII lines compared to Hb. Reasonable values are within 2-10",
             5
         )),
+        ('AGNtype', (
+            'int',
+            "AGN classification: 1 (Broad lines), 2 (Sy2, narrow lines), 3 (LINER).",
+            1
+        )),
     ])
 
     def _init_code(self):
@@ -68,13 +73,13 @@ class ActivateLines(CreationModule):
 
         """
 
-        AFeII = self.parameters["AFeII"]
         l_agn = sed.info['agn.lum5100A']
-        agnType = sed.info['agn.type']
+        agnType = self.parameters["AGNtype"]
         AFeII = self.parameters["AFeII"]
         
         sed.add_module(self.name, self.parameters)
-        sed.add_info('agn.AFeII', self.parameters["AFeII"])
+        sed.add_info('agn.AFeII', AFeII)
+        sed.add_info('agn.type', agnType)
 
         l_broadlines = 0.02 * l_agn
         l_narrowlines = 0.002 * l_agn
