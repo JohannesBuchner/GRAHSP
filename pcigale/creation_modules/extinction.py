@@ -93,6 +93,7 @@ class ExtinctionLaw(CreationModule):
 
         attenuation_total = 0.
         attenuation_total_total = 0.
+        attenuation_total_gal = 0.
         sed.add_module(self.name, self.parameters)
         for contrib in list(sed.contribution_names):
             luminosity = sed.get_lumin_contribution(contrib)
@@ -108,6 +109,8 @@ class ExtinctionLaw(CreationModule):
                 # spectrum is negative).
                 attenuation = -1 * np.trapz(attenuation_spectrum, wavelength)
                 attenuation_total += attenuation
+                if 'activate' not in contrib:
+                    attenuation_total_gal += attenuation
 
                 #sed.add_info("attenuation.E_BVs." + contrib, e_bv)
                 #sed.add_info("attenuation." + contrib, attenuation, True)
@@ -121,10 +124,10 @@ class ExtinctionLaw(CreationModule):
             # Total attenuation
             if 'dust.luminosity' in sed.info:
                 sed.add_info("dust.luminosity",
-                             sed.info["dust.luminosity"] + attenuation_total, True,
+                             sed.info["dust.luminosity"] + attenuation_total_gal, True,
                              True)
             else:
-                sed.add_info("dust.luminosity", attenuation_total, True)
+                sed.add_info("dust.luminosity", attenuation_total_gal, True)
 
         if self.store_filter_attenuation:
             # Fλ fluxes (only from continuum) in each filter after attenuation.
