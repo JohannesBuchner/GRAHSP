@@ -10,6 +10,9 @@ from setuptools import find_packages, setup
 
 class custom_build(build):
     def run(self):
+        import os
+        if os.path.exists('pcigale/data/data.db'):
+            os.unlink('pcigale/data/data.db')
         # Build the database.
         import database_builder
         database_builder.build_base()
@@ -24,7 +27,7 @@ entry_points = {
 
 setup(
     name="grahsp",
-    version="0.7.2",
+    version="0.7.4",
     packages=find_packages(exclude=["database_builder"]),
 
     install_requires=['numpy', 'scipy', 'sqlalchemy', 'matplotlib',

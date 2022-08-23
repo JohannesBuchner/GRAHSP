@@ -25,10 +25,20 @@ from scipy.special import factorial
 from ..creation_modules import CreationModule
 from astropy.cosmology import WMAP7 as cosmology
 
-import joblib
-mem = joblib.Memory('.', verbose=False)
+def igm_transmission_cached(wavelength, redshift):
+    """ memoize pure igm_transmission function """
+    if redshift == igm_transmission_cached.last_call_redshift and np.array_equal(wavelength, igm_transmission_cached.last_call_wavelength) and (wavelength == igm_transmission_cached.last_call_wavelength).all():
+        return igm_transmission_cached.last_call_result
+    igm_transmission_cached.last_call_result = igm_transmission(wavelength, redshift)
+    igm_transmission_cached.last_call_wavelength = wavelength
+    igm_transmission_cached.last_call_redshift = redshift
+    return igm_transmission_cached.last_call_result
 
-@mem.cache
+igm_transmission_cached.last_call_redshift = np.nan
+igm_transmission_cached.last_call_wavelength = None
+igm_transmission_cached.last_call_result = None
+
+
 def igm_transmission(wavelength, redshift):
     """Intergalactic transmission (Meiksin, 2006)
 
@@ -210,7 +220,7 @@ class Redshifting(CreationModule):
         # fraction of 0.
         key = sed.wavelength_grid.size
         if key not in self.igm_attenuation:
-            self.igm_attenuation[key] = igm_transmission(sed.wavelength_grid,
+            self.igm_attenuation[key] = igm_transmission_cached(sed.wavelength_grid,
                                                          redshift) - 1.
         sed.add_contribution('igm', sed.wavelength_grid,
                              self.igm_attenuation[key] * sed.luminosity)
