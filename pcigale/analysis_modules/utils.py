@@ -9,6 +9,7 @@ Various utility functions for pcigale analysis modules
 
 from datetime import datetime
 import collections
+collections.Iterable = collections.abc.Iterable
 import itertools
 import os
 import shutil

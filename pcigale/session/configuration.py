@@ -7,6 +7,7 @@ import configobj
 import pkg_resources
 import pkgutil
 import collections
+collections.Iterable = collections.abc.Iterable
 import multiprocessing as mp
 import numpy as np
 from glob import glob  # To allow the use of glob() in "eval..."
