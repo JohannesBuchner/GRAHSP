@@ -35,7 +35,8 @@ from .nebular_lines import NebularLines
 
 DATABASE_FILE = pkg_resources.resource_filename(__name__, 'data.db')
 
-if os.path.environ.get('DB_IN_MEMORY', '0') == '1':
+import os
+if os.environ.get('DB_IN_MEMORY', '0') == '1':
     ENGINE = create_engine('sqlite:///')
     import sqlite3
     filedb = sqlite3.connect('file:' + DATABASE_FILE + '?mode=ro', uri=True)
