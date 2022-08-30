@@ -35,7 +35,16 @@ from .nebular_lines import NebularLines
 
 DATABASE_FILE = pkg_resources.resource_filename(__name__, 'data.db')
 
-ENGINE = create_engine('sqlite:///' + DATABASE_FILE, echo=False)
+if os.path.environ.get('DB_IN_MEMORY', '0') == '1':
+    ENGINE = create_engine('sqlite:///')
+    import sqlite3
+    filedb = sqlite3.connect('file:' + DATABASE_FILE + '?mode=ro', uri=True)
+    print("loading database into memory ...")
+    filedb.backup(ENGINE.raw_connection().connection)
+    print("loading database into memory ... done")
+    filedb.close()
+else:
+    ENGINE = create_engine('sqlite:///' + DATABASE_FILE, echo=False)
 BASE = declarative_base()
 SESSION = sessionmaker(bind=ENGINE)
 
