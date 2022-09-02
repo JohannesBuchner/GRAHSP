@@ -15,6 +15,8 @@ import numpy as np
 from pcigale.data import Database
 from . import CreationModule
 import scipy.constants as cst
+
+fwhm_to_sigma_conversion = 1 / (2 * np.sqrt(2 * np.log(2)))
         
 class ActivateLines(CreationModule):
     """Activate AGN Emission lines (BL, Sy2 or LINER), and FeII forest
@@ -29,6 +31,17 @@ class ActivateLines(CreationModule):
         ('AGNtype', (
             'int',
             "AGN classification: 1 (Broad lines), 2 (Sy2, narrow lines), 3 (LINER).",
+            1
+        )),
+        ('linewidth', (
+            'float',
+            "Line width in km/s. Reasonable values are 100-10000."
+            "Use 100 if you do not attempt to resolve the lines.",
+            100
+        )),
+        ('linestrength_boost_factor', (
+            'float',
+            "factor to multiply Netzer's typical equivalent widths",
             1
         )),
     ])
@@ -50,11 +63,13 @@ class ActivateLines(CreationModule):
         
         # we do not attempt to resolve the lines
         # so choose something very small here
-        lines_width = 100 # km / s
+        self.lines_width = self.parameters["linewidth"]  # km / s
+        print("line width: FWHM=", self.lines_width, "km/s")
         new_wave = np.array([])
         for line_wave in self.emLines.wave:
             # get line width in nm
-            width = line_wave * (lines_width * 1000) / cst.c
+            width = line_wave * (self.lines_width * 1000) / cst.c
+            print("line width in nm:", width, "at", line_wave, "R:", width / line_wave)
             new_wave = np.concatenate(
                 (new_wave,
                  np.linspace(line_wave - 3. * width,
@@ -76,13 +91,14 @@ class ActivateLines(CreationModule):
         l_agn = sed.info['agn.lum5100A']
         agnType = self.parameters["AGNtype"]
         AFeII = self.parameters["AFeII"]
+        linestrength_boost_factor = self.parameters["linestrength_boost_factor"]
         
         sed.add_module(self.name, self.parameters)
         sed.add_info('agn.AFeII', AFeII)
         sed.add_info('agn.type', agnType)
 
-        l_broadlines = 0.02 * l_agn
-        l_narrowlines = 0.002 * l_agn
+        l_broadlines = 0.02 * l_agn * linestrength_boost_factor
+        l_narrowlines = 0.002 * l_agn * linestrength_boost_factor
         if agnType == 1: # BLAGN
             self.add_lines(sed, 'agn.activate_EmLines_BL', self.emLines.wave,
                                  l_broadlines * self.emLines.lumin_BLAGN)
@@ -114,11 +130,11 @@ class ActivateLines(CreationModule):
         new_wave = self.new_wave
         new_lumin = np.zeros_like(new_wave)
         for line_flux, line_wave in zip(lumin, wave):
-            lines_width = 100 # km / s
-            width = line_wave * (lines_width * 1000) / cst.c
-            new_lumin += (line_flux * np.exp(- 4. * np.log(2.) *
-                        (new_wave - line_wave) ** 2. / (width * width)) /
-                        (width * np.sqrt(np.pi / np.log(2.)) / 2.))
+            width = line_wave * (self.lines_width * 1000) / cst.c
+            sigma = width * fwhm_to_sigma_conversion
+            norm = 510 / np.sqrt(np.pi * sigma**2)
+            shape = np.exp(-0.5 * (new_wave - line_wave) ** 2. / sigma**2)
+            new_lumin += line_flux * shape * norm
         
         sed.add_contribution(name, new_wave, new_lumin)
 
