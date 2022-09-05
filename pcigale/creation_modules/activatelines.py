@@ -64,12 +64,10 @@ class ActivateLines(CreationModule):
         # we do not attempt to resolve the lines
         # so choose something very small here
         self.lines_width = self.parameters["linewidth"]  # km / s
-        print("line width: FWHM=", self.lines_width, "km/s")
         new_wave = np.array([])
         for line_wave in self.emLines.wave:
             # get line width in nm
             width = line_wave * (self.lines_width * 1000) / cst.c
-            print("line width in nm:", width, "at", line_wave, "R:", width / line_wave)
             new_wave = np.concatenate(
                 (new_wave,
                  np.linspace(line_wave - 3. * width,
