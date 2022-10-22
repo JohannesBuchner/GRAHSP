@@ -84,31 +84,13 @@ class ActivateTorus(CreationModule):
         else:
             torus_deviation = (self.torus_lo.lumin - self.torus_avg.lumin) * -TORtemp
 
-        sed.add_contribution('agn.activate_Torus', self.torus_avg.wave,
-                             l_torus * (self.torus_avg.lumin + torus_deviation))
-        sed.add_contribution('agn.activate_TorusSi', self.si.wave,
-                             l_torus * self.si.lumin * Si)
+        torus_spectrum = l_torus * (self.torus_avg.lumin + torus_deviation)
+        sed.add_contribution('agn.activate_Torus', self.torus_avg.wave, torus_spectrum)
+        si_spectrum = l_torus * self.si.lumin * Si
+        sed.add_contribution('agn.activate_TorusSi', self.si.wave, si_spectrum)
+        l_torus_6um = np.interp(6000., self.torus_avg.wave, torus_spectrum)
+        l_si_6um = np.interp(6000., self.si.wave, si_spectrum)
+        sed.add_info('agn.lum6um', l_torus_6um + l_si_6um, True)
     
-    def add_lines(self, sed, name, wave, lumin):
-        """ make small gaussian lines out of the delta function information """
-        # prev:
-        # sed.add_contribution(name, wave, lumin)
-        
-        # all widths are FWHM, so
-        # sigma = width / (2 * sqrt(2 * log(2)))
-        
-        # we do not attempt to resolve the lines
-        # so choose something very small here
-        new_wave = self.new_wave
-        new_lumin = np.zeros_like(new_wave)
-        for line_flux, line_wave in zip(lumin, wave):
-            lines_width = 100 # km / s
-            width = line_wave * (lines_width * 1000) / cst.c
-            new_lumin += (line_flux * np.exp(- 4. * np.log(2.) *
-                        (new_wave - line_wave) ** 2. / (width * width)) /
-                        (width * np.sqrt(np.pi / np.log(2.)) / 2.))
-        
-        sed.add_contribution(name, new_wave, new_lumin)
-
 # CreationModule to be returned by get_module
 Module = ActivateTorus

@@ -85,8 +85,9 @@ class ActivatePL(CreationModule):
             self.parameters["uvslope"], self.parameters["plslope"],
             510.0, self.parameters["plbendloc"], self.parameters["plbendwidth"])
         assert np.isfinite(bbb).all()
-        
+
         sed.add_contribution('agn.activate_Disk', sed.wavelength_grid, bbb)
+        sed.add_info('agn.lum2500A_disk', np.interp(250., sed.wavelength_grid, bbb), True)
 
 # CreationModule to be returned by get_module
 Module = ActivatePL

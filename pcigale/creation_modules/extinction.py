@@ -94,6 +94,9 @@ class ExtinctionLaw(CreationModule):
         attenuation_total = 0.
         attenuation_total_total = 0.
         attenuation_total_gal = 0.
+        Lbol_total_gal = 0.
+        Lbol_total_agn = 0.
+        Lbol_total = 0.
         sed.add_module(self.name, self.parameters)
         for contrib in list(sed.contribution_names):
             luminosity = sed.get_lumin_contribution(contrib)
@@ -109,8 +112,13 @@ class ExtinctionLaw(CreationModule):
                 # spectrum is negative).
                 attenuation = -1 * np.trapz(attenuation_spectrum, wavelength)
                 attenuation_total += attenuation
+                lum = np.trapz(luminosity, wavelength)
+                Lbol_total += lum
                 if 'activate' not in contrib:
                     attenuation_total_gal += attenuation
+                    Lbol_total_gal += lum
+                else:
+                    Lbol_total_agn += lum
 
                 #sed.add_info("attenuation.E_BVs." + contrib, e_bv)
                 #sed.add_info("attenuation." + contrib, attenuation, True)
@@ -128,6 +136,10 @@ class ExtinctionLaw(CreationModule):
                              True)
             else:
                 sed.add_info("dust.luminosity", attenuation_total_gal, True)
+            # Bolometric, intrinsic, rest-frame luminosities
+            sed.add_info("bol.luminosity_intrinsic", Lbol_total, True)
+            sed.add_info("bol.luminosity_gal_intrinsic", Lbol_total_gal, True)
+            sed.add_info("bol.luminosity_agn_intrinsic", Lbol_total_agn, True)
 
         if self.store_filter_attenuation:
             # Fλ fluxes (only from continuum) in each filter after attenuation.
