@@ -955,7 +955,7 @@ def build_nebular(base):
         base.add_nebular_continuum(cont)
 
 
-def build_base_full():
+def build_base(speed):
     base = Database(writable=True)
     base.upgrade_base()
     
