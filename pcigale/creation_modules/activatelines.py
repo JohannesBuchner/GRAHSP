@@ -36,8 +36,8 @@ class ActivateLines(CreationModule):
         ('linewidth', (
             'float',
             "Line width in km/s. Reasonable values are 100-10000."
-            "Use 100 if you do not attempt to resolve the lines.",
-            100
+            "Use 1000 if you do not attempt to resolve the lines.",
+            5000
         )),
         ('linestrength_boost_factor', (
             'float',

@@ -139,7 +139,6 @@ class NebularEmission(CreationModule):
                 self.fesc + self.fdust))
 
             self.corr = k
-            print("corr:", self.corr)
         self.idx_Ly_break = None
         self.absorbed_old = None
         self.absorbed_young = None
@@ -158,7 +157,6 @@ class NebularEmission(CreationModule):
             self.absorbed_old = np.zeros(sed.wavelength_grid.size)
             self.absorbed_young = np.zeros(sed.wavelength_grid.size)
 
-        print(self.absorbed_old.shape, self.idx_Ly_break, sed.contribution_names, self.fesc)
         self.absorbed_old[:self.idx_Ly_break] = -(
             sed.luminosities[sed.contribution_names.index("stellar.old"), :self.idx_Ly_break] *
             (1. - self.fesc))
@@ -190,7 +188,6 @@ class NebularEmission(CreationModule):
             sed.add_info("nebular.zgas", self.zgas)
             sed.add_info("nebular.ne", self.ne, unit="cm^-3")
 
-            print("lines added:", NLy_old, NLy_young, self.corr, cont.lumin.max(), lines.ratio.max())
             sed.add_contribution("nebular.lines_old", lines.wave,
                                  lines.ratio * NLy_old * self.corr)
             sed.add_contribution("nebular.lines_young", lines.wave,
