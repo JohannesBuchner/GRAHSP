@@ -47,15 +47,81 @@ class BC03(CreationModule):
         ))
     ])
 
+    def convolve(self, sfh):
+        """Convolve the SSP with a Star Formation History
+
+        Given an SFH, this method convolves the info table and the SSP
+        luminosity spectrum.
+
+        Parameters
+        ----------
+        sfh: array of floats
+            Star Formation History in Msun/yr.
+
+        Returns
+        -------
+        spec_young: array of floats
+            Spectrum in W/nm of the young stellar populations.
+        spec_old: array of floats
+            Same as spec_young but for the old stellar populations.
+        info_young: dictionary
+            Dictionary containing various information from the *.?color tables
+            for the young stellar populations:
+            * "m_star": Total mass in stars in Msun
+            * "m_gas": Mass returned to the ISM by evolved stars in Msun
+            * "n_ly": rate of H-ionizing photons (s-1)
+        info_old : dictionary
+            Same as info_young but for the old stellar populations.
+        info_all: dictionary
+            Same as info_young but for the entire stellar population. Also
+            contains "age_mass", the stellar mass-weighted age
+
+        """
+        # We cut the SSP to the maximum age considered to simplify the
+        # computation. We take only the first three elements from the
+        # info table as the others do not make sense when convolved with the
+        # SFH (break strength).
+        info = self.ssp.info[:, :sfh.size]
+        spec = self.ssp.spec[:, :sfh.size]
+
+        # The convolution is just a matter of reverting the SFH and computing
+        # the sum of the data from the SSP one to one product. This is done
+        # using the dot product. The 1e6 factor is because the SFH is in solar
+        # mass per year.
+        info_young = 1e6 * np.dot(info[:, :self.separation_age],
+                                  sfh[-self.separation_age:][::-1])
+        spec_young = 1e6 * np.dot(spec[:, :self.separation_age],
+                                  sfh[-self.separation_age:][::-1])
+
+        info_old = 1e6 * np.dot(info[:, self.separation_age:],
+                                sfh[:-self.separation_age][::-1])
+        spec_old = 1e6 * np.dot(spec[:, self.separation_age:],
+                                sfh[:-self.separation_age][::-1])
+
+        info_all = info_young + info_old
+
+        info_young = dict(zip(["m_star", "m_gas", "n_ly"], info_young))
+        info_old = dict(zip(["m_star", "m_gas", "n_ly"], info_old))
+        info_all = dict(zip(["m_star", "m_gas", "n_ly"], info_all))
+
+        info_all['age_mass'] = np.average(self.ssp.t[:sfh.size],
+                                          weights=info[0, :] * sfh[::-1])
+
+        return spec_young, spec_old, info_young, info_old, info_all
+
     def _init_code(self):
         """Read the SSP from the database."""
-        if self.parameters["imf"] == 0:
-            imf = 'salp'
-        elif self.parameters["imf"] == 1:
-            imf = 'chab'
-        metallicity = float(self.parameters["metallicity"])
+        self.imf = int(self.parameters["imf"])
+        self.Z = float(self.parameters["metallicity"])
+        self.separation_age = int(self.parameters["separation_age"])
+
         with Database() as database:
-            self.ssp = database.get_bc03(imf, metallicity)
+            if self.imf == 0:
+                self.ssp = database.get_bc03(imf='salp', metallicity=self.Z)
+            elif self.imf == 1:
+                self.ssp = database.get_bc03(imf='chab', metallicity=self.Z)
+            else:
+                raise Exception(f"IMF #{self.imf} unknown")
 
     def process(self, sed):
         """Add the convolution of a Bruzual and Charlot SSP to the SED
@@ -66,66 +132,53 @@ class BC03(CreationModule):
             SED object.
 
         """
-        imf = self.parameters["imf"]
-        metallicity = float(self.parameters["metallicity"])
-        separation_age = int(self.parameters["separation_age"])
-        sfh_time, sfh_sfr = sed.sfh
-        ssp = self.ssp
-
-        # Age of the galaxy at each time of the SFH
-        sfh_age = np.max(sfh_time) - sfh_time
-
-        # First, we process the young population (age lower than the
-        # separation age.)
-        young_sfh = np.copy(sfh_sfr)
-        young_sfh[sfh_age > separation_age] = 0
-        young_wave, young_lumin, young_info = ssp.convolve(sfh_time, young_sfh)
-
-        # Then, we process the old population. If the SFH is shorter than the
-        # separation age then all the arrays will consist only of 0.
-        old_sfh = np.copy(sfh_sfr)
-        old_sfh[sfh_age <= separation_age] = 0
-        old_wave, old_lumin, old_info = ssp.convolve(sfh_time, old_sfh)
+        out = self.convolve(sed.sfh)
+        spec_young, spec_old, info_young, info_old, info_all = out
 
         # We compute the Lyman continuum luminosity as it is important to
         # compute the energy absorbed by the dust before ionising gas.
-        w = np.where(young_wave <= 91.1)
-        lum_ly_young = np.trapz(young_lumin[w], young_wave[w])
-        lum_ly_old = np.trapz(old_lumin[w], old_wave[w])
+        wave = self.ssp.wl
+        w = np.where(wave <= 91.1)
+        lum_lyc_young, lum_lyc_old = np.trapz([spec_young[w], spec_old[w]],
+                                              wave[w])
+
+        # We do similarly for the total stellar luminosity
+        lum_young, lum_old = np.trapz([spec_young, spec_old], wave)
 
         sed.add_module(self.name, self.parameters)
 
-        sed.add_info("stellar.imf", imf)
-        sed.add_info("stellar.metallicity", metallicity)
-        sed.add_info("stellar.old_young_separation_age", separation_age)
+        sed.add_info("stellar.imf", self.imf)
+        sed.add_info("stellar.metallicity", self.Z)
+        sed.add_info("stellar.old_young_separation_age", self.separation_age,
+                     unit='Myr')
 
-        sed.add_info("stellar.m_star_young", young_info["m_star"], True)
-        sed.add_info("stellar.m_gas_young", young_info["m_gas"], True)
-        sed.add_info("stellar.n_ly_young", young_info["n_ly"], True)
-        sed.add_info("stellar.lum_ly_young", lum_ly_young, True)
-        sed.add_info("stellar.b_400_young", young_info["b_4000"])
-        sed.add_info("stellar.b4_vn_young", young_info["b4_vn"])
-        sed.add_info("stellar.b4_sdss_young", young_info["b4_sdss"])
-        sed.add_info("stellar.b_912_young", young_info["b_912"])
+        sed.add_info("stellar.m_star_young", info_young["m_star"], True,
+                     unit='solMass')
+        sed.add_info("stellar.m_gas_young", info_young["m_gas"], True,
+                     unit='solMass')
+        sed.add_info("stellar.n_ly_young", info_young["n_ly"], True,
+                     unit='ph/s')
+        sed.add_info("stellar.lum_ly_young", lum_lyc_young, True, unit='W')
+        sed.add_info("stellar.lum_young", lum_young, True, unit='W')
 
-        sed.add_info("stellar.m_star_old", old_info["m_star"], True)
-        sed.add_info("stellar.m_gas_old", old_info["m_gas"], True)
-        sed.add_info("stellar.n_ly_old", old_info["n_ly"], True)
-        sed.add_info("stellar.lum_ly_old", lum_ly_old, True)
-        sed.add_info("stellar.b_400_old", old_info["b_4000"])
-        sed.add_info("stellar.b4_vn_old", old_info["b4_vn"])
-        sed.add_info("stellar.b4_sdss_old", old_info["b4_sdss"])
-        sed.add_info("stellar.b_912_old", old_info["b_912"])
+        sed.add_info("stellar.m_star_old", info_old["m_star"], True,
+                     unit='solMass')
+        sed.add_info("stellar.m_gas_old", info_old["m_gas"], True,
+                     unit='solMass')
+        sed.add_info("stellar.n_ly_old", info_old["n_ly"], True, unit='ph/s')
+        sed.add_info("stellar.lum_ly_old", lum_lyc_old, True, unit='W')
+        sed.add_info("stellar.lum_old", lum_old, True, unit='W')
 
-        sed.add_info("stellar.m_star",
-                     young_info["m_star"] + old_info["m_star"],
-                     True)
-        sed.add_info("stellar.m_gas",
-                     young_info["m_gas"] + old_info["m_gas"],
-                     True)
+        sed.add_info("stellar.m_star", info_all["m_star"], True, unit='solMass')
+        sed.add_info("stellar.m_gas", info_all["m_gas"], True, unit='solMass')
+        sed.add_info("stellar.n_ly", info_all["n_ly"], True, unit='ph/s')
+        sed.add_info("stellar.lum_ly", lum_lyc_young + lum_lyc_old, True, unit='W')
+        sed.add_info("stellar.lum", lum_young + lum_old, True, unit='W')
+        sed.add_info("stellar.age_m_star", info_all["age_mass"], unit='Myr')
 
-        sed.add_contribution("stellar.old", old_wave, old_lumin)
-        sed.add_contribution("stellar.young", young_wave, young_lumin)
+        sed.add_contribution("stellar.old", wave, spec_old)
+        sed.add_contribution("stellar.young", wave, spec_young)
+
 
 # CreationModule to be returned by get_module
 Module = BC03

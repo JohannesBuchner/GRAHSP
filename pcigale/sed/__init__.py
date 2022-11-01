@@ -77,8 +77,8 @@ class SED(object):
         """
         if self._sfh is None:
             return None
-        else:
-            return np.copy(self._sfh)
+
+        return np.copy(self._sfh)
 
     @sfh.setter
     def sfh(self, value):
@@ -88,15 +88,15 @@ class SED(object):
         # it's needed.
         self._sfh = value
 
-        if value:
-            sfh_time, sfh_sfr = value
+        if value is not None:
+            sfh_sfr = value
             self._sfh = value
             self.add_info("sfh.sfr", sfh_sfr[-1], True, force=True)
             self.add_info("sfh.sfr10Myrs", np.mean(sfh_sfr[-10:]), True,
                           force=True)
             self.add_info("sfh.sfr100Myrs", np.mean(sfh_sfr[-100:]), True,
                           force=True)
-            self.add_info("sfh.age", sfh_time[-1], False, force=True)
+            self.add_info("sfh.age", sfh_sfr.size, False, force=True)
 
     @property
     def fnu(self):
@@ -116,7 +116,7 @@ class SED(object):
 
         return f_nu
 
-    def add_info(self, key, value, mass_proportional=False, force=False):
+    def add_info(self, key, value, mass_proportional=False, force=False, unit=None):
         """
         Add a key / value to the information dictionary
 

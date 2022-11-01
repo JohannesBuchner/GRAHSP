@@ -217,11 +217,12 @@ def build_cosmos_filters(base):
         base.add_filter(new_filter)
 
 
-def build_m2005(base):
+def build_m2005(base, quick=False):
     m2005_dir = os.path.join(os.path.dirname(__file__), 'maraston2005/')
 
     # Age grid (1 Myr to 13.7 Gyr with 1 Myr step)
-    age_grid = np.arange(1, 13701)
+    time_grid = np.arange(1, 13701)
+    fine_time_grid = np.linspace(0.1, 13700, 137000)
 
     # Transpose the table to have access to each value vector on the first
     # axis
@@ -235,6 +236,10 @@ def build_m2005(base):
 
         spec_table = np.genfromtxt(spec_file).transpose()
         metallicity = spec_table[1, 0]
+        if quick:
+            # only use solar metallicity if quick
+            if metallicity != 0:
+                continue
 
         if 'krz' in spec_file:
             imf = 'krou'
@@ -251,50 +256,57 @@ def build_m2005(base):
         # populations.
         mass_table = mass_table[1:7, mass_table[0] == metallicity]
 
-        # Interpolate the mass table over the new age grid. We multiply per
-        # 1000 because the time in Maraston files is given in Gyr.
-        mass_table = interpolate.interp1d(mass_table[0] * 1000,
-                                          mass_table)(age_grid)
+        # Regrid the SSP data to the evenly spaced time grid. In doing so we
+        # assume 10 bursts every 0.1 Myr over a period of 1 Myr in order to
+        # capture short evolutionary phases.
+        # The time grid starts after 0.1 Myr, so we assume the value is the same
+        # as the first actual time step.
+        mass_table = interpolate.interp1d(mass_table[0] * 1e3, mass_table[1:],
+                                          assume_sorted=True)(fine_time_grid)
+        mass_table = np.mean(mass_table.reshape(5, -1, 10), axis=-1)
 
-        # Remove the age column from the mass table
-        mass_table = np.delete(mass_table, 0, 0)
+        # Extract the age and convert from Gyr to Myr
+        ssp_time = np.unique(spec_table[0]) * 1e3
+        spec_table = spec_table[1:]
 
         # Remove the metallicity column from the spec table
-        spec_table = np.delete(spec_table, 1, 0)
+        spec_table = spec_table[1:]
 
-        # Convert the wavelength from Å to nm
-        spec_table[1] = spec_table[1] * 0.1
+        # Extract the wavelength and convert from Å to nm
+        ssp_wave = spec_table[0][:1221] * 0.1
+        spec_table = spec_table[1:]
 
-        # For all ages, the lambda grid is the same.
-        lambda_grid = np.unique(spec_table[1])
+        # Extra the fluxes and convert from erg/s/Å to W/nm
+        ssp_lumin = spec_table[0].reshape(ssp_time.size, ssp_wave.size).T
+        ssp_lumin *= 10 * 1e-7
 
-        # Creation of the age vs lambda flux table
-        tmp_list = []
-        for wavelength in lambda_grid:
-            [age_grid_orig, lambda_grid_orig, flux_orig] = \
-                spec_table[:, spec_table[1, :] == wavelength]
-            flux_orig = flux_orig * 10 * 1.e-7  # From erg/s^-1/Å to W/nm
-            age_grid_orig = age_grid_orig * 1000  # Gyr to Myr
-            flux_regrid = interpolate.interp1d(age_grid_orig,
-                                               flux_orig)(age_grid)
-
-            tmp_list.append(flux_regrid)
-        flux_age = np.array(tmp_list)
+        # We have to do the interpolation-averaging in several blocks as it is
+        # a bit RAM intensive
+        ssp_lumin_interp = np.empty((ssp_wave.size, time_grid.size))
+        for i in range(0, ssp_wave.size, 100):
+            fill_value = (ssp_lumin[i:i+100, 0], ssp_lumin[i:i+100, -1])
+            ssp_interp = interpolate.interp1d(ssp_time, ssp_lumin[i:i+100, :],
+                                              fill_value=fill_value,
+                                              bounds_error=False,
+                                              assume_sorted=True)(fine_time_grid)
+            ssp_interp = ssp_interp.reshape(ssp_interp.shape[0], -1, 10)
+            ssp_lumin_interp[i:i+100, :] = np.mean(ssp_interp, axis=-1)
 
         # To avoid the creation of waves when interpolating, we refine the grid
         # beyond 10 μm following a log scale in wavelength. The interpolation
         # is also done in log space as the spectrum is power-law-like
-        lambda_grid_resamp = np.around(np.logspace(np.log10(10000),
+        ssp_wave_resamp = np.around(np.logspace(np.log10(10000),
                                                    np.log10(160000), 50))
-        argmin = np.argmin(10000.-lambda_grid > 0)-1
-        flux_age_resamp = 10.**interpolate.interp1d(
-                                    np.log10(lambda_grid[argmin:]),
-                                    np.log10(flux_age[argmin:, :]),
+        argmin = np.argmin(10000.-ssp_wave > 0)-1
+        ssp_lumin_resamp = 10.**interpolate.interp1d(
+                                    np.log10(ssp_wave[argmin:]),
+                                    np.log10(ssp_lumin_interp[argmin:, :]),
                                     assume_sorted=True,
-                                    axis=0)(np.log10(lambda_grid_resamp))
+                                    axis=0)(np.log10(ssp_wave_resamp))
 
-        lambda_grid = np.hstack([lambda_grid[:argmin+1], lambda_grid_resamp])
-        flux_age = np.vstack([flux_age[:argmin+1, :], flux_age_resamp])
+        ssp_wave = np.hstack([ssp_wave[:argmin+1], ssp_wave_resamp])
+        ssp_lumin = np.vstack([ssp_lumin_interp[:argmin+1, :],
+                               ssp_lumin_resamp])
 
         # Use Z value for metallicity, not log([Z/H])
         metallicity = {-1.35: 0.001,
@@ -302,15 +314,16 @@ def build_m2005(base):
                        0.0: 0.02,
                        0.35: 0.04}[metallicity]
 
-        base.add_m2005(M2005(imf, metallicity, age_grid, lambda_grid,
-                             mass_table, flux_age))
+        base.add_m2005(M2005(imf, metallicity, time_grid, ssp_wave,
+                             mass_table, ssp_lumin))
 
 
-def build_bc2003(base):
+def build_bc2003(base, quick=False):
     bc03_dir = os.path.join(os.path.dirname(__file__), 'bc03//')
 
     # Time grid (1 Myr to 14 Gyr with 1 Myr step)
     time_grid = np.arange(1, 14000)
+    fine_time_grid = np.linspace(0.1, 13999, 139990)
 
     # Metallicities associated to each key
     metallicity = {
@@ -321,6 +334,10 @@ def build_bc2003(base):
         "m62": 0.02,
         "m72": 0.05
     }
+    if quick:
+        metallicity = {
+            "m62": 0.02,
+        }
 
     for key, imf in itertools.product(metallicity, ["salp", "chab"]):
         base_filename = bc03_dir + "bc2003_lr_" + key + "_" + imf + "_ssp"
@@ -337,19 +354,34 @@ def build_bc2003(base):
         color_table.append(color4_table[6])        # Mstar
         color_table.append(color4_table[7])        # Mgas
         color_table.append(10 ** color3_table[5])  # NLy
-        color_table.append(color3_table[1])        # B4000
-        color_table.append(color3_table[2])        # B4_VN
-        color_table.append(color3_table[3])        # B4_SDSS
-        color_table.append(color3_table[4])        # B(912)
 
         color_table = np.array(color_table)
 
         ssp_time, ssp_wave, ssp_lumin = read_bc03_ssp(ssp_filename)
 
-        # Regrid the SSP data to the evenly spaced time grid.
-        color_table = interpolate.interp1d(ssp_time, color_table)(time_grid)
-        ssp_lumin = interpolate.interp1d(ssp_time,
-                                         ssp_lumin)(time_grid)
+        # Regrid the SSP data to the evenly spaced time grid. In doing so we
+        # assume 10 bursts every 0.1 Myr over a period of 1 Myr in order to
+        # capture short evolutionary phases.
+        # The time grid starts after 0.1 Myr, so we assume the value is the same
+        # as the first actual time step.
+        fill_value = (color_table[:, 0], color_table[:, -1])
+        color_table = interpolate.interp1d(ssp_time, color_table,
+                                           fill_value=fill_value,
+                                           bounds_error=False,
+                                           assume_sorted=True)(fine_time_grid)
+        color_table = np.mean(color_table.reshape(3, -1, 10), axis=-1)
+
+        # We have to do the interpolation-averaging in several blocks as it is
+        # a bit RAM intensive
+        ssp_lumin_interp = np.empty((ssp_wave.size, time_grid.size))
+        for i in range(0, ssp_wave.size, 100):
+            fill_value = (ssp_lumin[i:i+100, 0], ssp_lumin[i:i+100, -1])
+            ssp_interp = interpolate.interp1d(ssp_time, ssp_lumin[i:i+100, :],
+                                              fill_value=fill_value,
+                                              bounds_error=False,
+                                              assume_sorted=True)(fine_time_grid)
+            ssp_interp = ssp_interp.reshape(ssp_interp.shape[0], -1, 10)
+            ssp_lumin_interp[i:i+100, :] = np.mean(ssp_interp, axis=-1)
 
         # To avoid the creation of waves when interpolating, we refine the grid
         # beyond 10 μm following a log scale in wavelength. The interpolation
@@ -359,12 +391,13 @@ def build_bc2003(base):
         argmin = np.argmin(10000.-ssp_wave > 0)-1
         ssp_lumin_resamp = 10.**interpolate.interp1d(
                                     np.log10(ssp_wave[argmin:]),
-                                    np.log10(ssp_lumin[argmin:, :]),
+                                    np.log10(ssp_lumin_interp[argmin:, :]),
                                     assume_sorted=True,
                                     axis=0)(np.log10(ssp_wave_resamp))
 
         ssp_wave = np.hstack([ssp_wave[:argmin+1], ssp_wave_resamp])
-        ssp_lumin = np.vstack([ssp_lumin[:argmin+1, :], ssp_lumin_resamp])
+        ssp_lumin = np.vstack([ssp_lumin_interp[:argmin+1, :],
+                               ssp_lumin_resamp])
 
         base.add_bc03(BC03(
             imf,
@@ -434,7 +467,7 @@ def build_dale2014(base):
     base.add_dale2014(Dale2014(1.0, 0.0, wave, lumin_quasar))
 
 
-def build_dl2007(base):
+def build_dl2007(base, quick=False):
     dl2007_dir = os.path.join(os.path.dirname(__file__), 'dl2007/')
 
     qpah = {
@@ -476,6 +509,7 @@ def build_dl2007(base):
 
     for model in sorted(qpah.keys()):
         for umin in uminimum:
+            if quick and umin != "1.00": continue
             filename = dl2007_dir + "U{}/U{}_{}_MW3.1_{}.txt".format(umin,
                                                                      umin,
                                                                      umin,
@@ -492,6 +526,7 @@ def build_dl2007(base):
 
             base.add_dl2007(DL2007(qpah[model], umin, umin, wave, lumin))
             for umax in umaximum:
+                if quick: continue
                 filename = dl2007_dir + "U{}/U{}_{}_MW3.1_{}.txt".format(umin,
                                                                          umin,
                                                                          umax,
@@ -510,7 +545,7 @@ def build_dl2007(base):
                 base.add_dl2007(DL2007(qpah[model], umin, umax, wave, lumin))
 
 
-def build_dl2014(base):
+def build_dl2014(base, quick=False):
     dl2014_dir = os.path.join(os.path.dirname(__file__), 'dl2014/')
 
     qpah = {"000": 0.47, "010": 1.12, "020": 1.77, "030": 2.50, "040": 3.19,
@@ -551,6 +586,7 @@ def build_dl2014(base):
 
     for model in sorted(qpah.keys()):
         for umin in uminimum:
+            if quick and umin != "1.000": continue
             filename = (dl2014_dir + "U{}_{}_MW3.1_{}/spec_1.0.dat"
                         .format(umin, umin, model))
             print("Importing {}...".format(filename))
@@ -565,6 +601,7 @@ def build_dl2014(base):
 
             base.add_dl2014(DL2014(qpah[model], umin, umin, 1.0, wave, lumin))
             for al in alpha:
+                if quick: continue
                 filename = (dl2014_dir + "U{}_1e7_MW3.1_{}/spec_{}.dat"
                             .format(umin, model, al))
                 print("Importing {}...".format(filename))
@@ -684,11 +721,11 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
     #a = ["0.998", "0"]
     #Mdot = ["0.3", "0.03"]
     inc = ["0"]
-    print("Importing Activate NetzerDisk ...")
     c = 3.0e18 # arbitrary units, we only care about the shape
     
     included = set()
     if fine_netzer_disk:
+        print("Importing Activate NetzerDisk (fine grid, %s) ..." % ('all spins' if all_spins else 'spins a=0,0.7,0.998,-1'))
         # finer data table with spins
         header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_of_models_mbh_03_Mdot_03_spin21_header")
         #header = np.loadtxt(activate_dir + "agn/mor_netzer_2012/table_all_MBH_Mdot_0.1_0.1_spin_21_header")
@@ -701,7 +738,7 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
         freq = data[:,0]
         for i, (Mv, av, Mdotv) in enumerate(zip(logMBHs, spins, Mdots)):
             if av not in (0, 0.7, 0.998, -1) and not all_spins:
-                print("skipping spin", av)
+                # print("skipping spin", av)
                 continue
             Lnu = data[:,2+i]
             assert (Lnu >= 0).all(), (Lnu)
@@ -716,12 +753,13 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
             assert (Llam >= 0).all(), (Llam, norm)
             assert np.isfinite(Llam).all(), (Llam, norm)
             assert np.isfinite(wave).all(), (wave)
-            print("  ", params)
+            #print("  ", params)
             #if i == 0:
             #    print("    ", wave, Llam)
             base.add_ActivateNetzerDisk(NetzerDisk(params[0], params[1], params[2],
                                              params[3], wave, Llam))
     else:
+        print("Importing Activate NetzerDisk (course grid, spin=0,0.998) ...")
         M = ["6.0", "7.0", "8.0", "9.0"]
         a = ["0.998", "0"]
         Mdot = ["0.3", "0.03"]
@@ -929,34 +967,36 @@ def build_base_full():
     print('#' * 78)
 
     print("2- Importing Maraston 2005 SSP\n")
-    build_m2005(base)
+    build_m2005(base, quick=speed > 1)
     print("\nDONE\n")
     print('#' * 78)
 
     print("3- Importing Bruzual and Charlot 2003 SSP\n")
-    build_bc2003(base)
+    build_bc2003(base, quick=speed > 1)
     print("\nDONE\n")
     print('#' * 78)
 
-    print("4- Importing Draine and Li (2007) models\n")
-    build_dl2007(base)
-    print("\nDONE\n")
-    print('#' * 78)
+    if speed > 1:
+        print("4- Importing Draine and Li (2007) models\n")
+        build_dl2007(base, quick=speed > 0)
+        print("\nDONE\n")
+        print('#' * 78)
 
     print("5- Importing the updated Draine and Li (2007 models)\n")
-    build_dl2014(base)
+    build_dl2014(base, quick=speed > 0)
     print("\nDONE\n")
     print('#' * 78)
 
     print("6- Importing Activate models\n")
-    build_activate(base, fine_netzer_disk=True, all_spins=True)
+    build_activate(base, fine_netzer_disk=True, all_spins=False if speed >= 2 else True)
     print("\nDONE\n")
     print('#' * 78)
     
-    print("6- Importing Fritz et al. (2006) models\n")
-    build_fritz2006(base)
-    print("\nDONE\n")
-    print('#' * 78)
+    if speed < 2:
+        print("6- Importing Fritz et al. (2006) models\n")
+        build_fritz2006(base)
+        print("\nDONE\n")
+        print('#' * 78)
 
     print("7- Importing Dale et al (2014) templates\n")
     build_dale2014(base)
@@ -969,44 +1009,6 @@ def build_base_full():
     print('#' * 78)
 
     base.session.close_all()
-
-def build_base_quick():
-    base = Database(writable=True)
-    base.upgrade_base()
-    
-    print('#' * 78)
-    print("1- Importing filters...\n")
-    #build_cosmos_filters(base)
-    build_filters(base)
-    print("\nDONE\n")
-    print('#' * 78)
-
-    print("3- Importing Bruzual and Charlot 2003 SSP\n")
-    build_bc2003(base)
-    print("\nDONE\n")
-    print('#' * 78)
-
-    print("6- Importing Activate models\n")
-    build_activate(base, fine_netzer_disk=True, all_spins=False)
-    print("\nDONE\n")
-    print('#' * 78)
-
-    print("7- Importing Dale et al (2014) templates\n")
-    build_dale2014(base)
-    print("\nDONE\n")
-    print('#' * 78)
-
-    print("8- Importing nebular lines and continuum\n")
-    build_nebular(base)
-    print("\nDONE\n")
-    print('#' * 78)
-    
-    base.session.close_all()
-
-if os.environ.get('QUICK', '1') == '1':
-    build_base = build_base_quick
-else:
-    build_base = build_base_full
 
 if __name__ == '__main__':
-    build_base()
+    build_base(speed=int(os.environ.get('SPEED', '1')))

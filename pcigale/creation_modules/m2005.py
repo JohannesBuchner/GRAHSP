@@ -13,6 +13,7 @@ This module implements the Maraston (2005) Single Stellar Populations.
 
 from collections import OrderedDict
 import numpy as np
+import scipy.constants as cst
 from . import CreationModule
 from ..data import Database
 
@@ -59,15 +60,80 @@ class M2005(CreationModule):
         ))
     ])
 
+    def convolve(self, sfh):
+        """Convolve the SSP with a Star Formation History
+
+        Convolves the SSP and the associated info with the SFH.
+
+        Parameters
+        ----------
+        sfh: array of floats
+            Star Formation History in Msun/yr.
+
+        Returns
+        -------
+        spec_young: array of floats
+            Spectrum in W/nm of the young stellar populations.
+        spec_old: array of floats
+            Same as spec_young but for the old stellar populations.
+        info_young: array of floats
+            Contains the info for the young stellar populations:
+            * 0: total stellar mass
+            * 1: alive stellar mass
+            * 2: white dwarf stars mass
+            * 3: neutron stars mass
+            * 4: black holes mass
+        info_old: array of floats
+            Same as info_young but for the old stellar populations.
+        info_all: array of floats
+            Same as info_young but for the entire stellar population. Also
+            contains 5: stellar mass-weighted age
+
+        """
+        # We cut the SSP to the maximum age considered to simplify the
+        # computation.
+        info = self.ssp.info[:5, :sfh.size]
+        spec = self.ssp.spec[:, :sfh.size]
+
+        # As both the SFH and the SSP (limited to the age of the SFH) data now
+        # share the same time grid, the convolution is just a matter of
+        # reverting one and computing the sum of the one to one product; this
+        # is done using the dot product. The 1e6 factor is because the SFH is
+        # in solar mass per year.
+        info_young = 1e6 * np.dot(info[:, :self.separation_age],
+                                  sfh[-self.separation_age:][::-1])
+        spec_young = 1e6 * np.dot(spec[:, :self.separation_age],
+                                  sfh[-self.separation_age:][::-1])
+
+        info_old = 1e6 * np.dot(info[:, self.separation_age:],
+                                sfh[:-self.separation_age][::-1])
+        spec_old = 1e6 * np.dot(spec[:, self.separation_age:],
+                                sfh[:-self.separation_age][::-1])
+
+        info_all = info_young + info_old
+        info_all = np.append(info_all, np.average(self.ssp.t[:sfh.size],
+                                                  weights=info[1, :] *
+                                                  sfh[::-1]))
+
+        return spec_young, spec_old, info_young, info_old, info_all
+
     def _init_code(self):
         """Read the SSP from the database."""
-        if self.parameters["imf"] == 0:
-            imf = 'salp'
-        elif self.parameters["imf"] == 1:
-            imf = 'krou'
-        metallicity = float(self.parameters["metallicity"])
+        self.imf = int(self.parameters["imf"])
+        self.Z = float(self.parameters["metallicity"])
+        self.separation_age = int(self.parameters["separation_age"])
+
         with Database() as database:
-            self.ssp = database.get_m2005(imf, metallicity)
+            if self.imf == 0:
+                self.ssp = database.get_m2005(imf='salp', metallicity=self.Z)
+            elif self.imf == 1:
+                self.ssp = database.get_m2005(imf='krou', metallicity=self.Z)
+            else:
+                raise Exception(f"IMF #{self.imf} unknown")
+
+        self.mask_Q = slice(0, np.searchsorted(self.ssp.wl, 91.2))
+        self.wvl_H = self.ssp.wl[self.mask_Q]
+        self.invhc = 1.0 / (cst.h * cst.c)
 
     def process(self, sed):
         """Add the convolution of a Maraston 2005 SSP to the SED
@@ -78,62 +144,69 @@ class M2005(CreationModule):
             SED object.
 
         """
-        imf = self.parameters["imf"]
-        metallicity = float(self.parameters["metallicity"])
-        separation_age = int(self.parameters["separation_age"])
-        sfh_time, sfh_sfr = sed.sfh
-        ssp = self.ssp
-
-        # Age of the galaxy at each time of the SFH
-        sfh_age = np.max(sfh_time) - sfh_time
-
-        # First, we process the young population (age lower than the
-        # separation age.)
-        young_sfh = np.copy(sfh_sfr)
-        young_sfh[sfh_age > separation_age] = 0
-        young_masses, young_spectrum = ssp.convolve(sfh_time, young_sfh)
-
-        # Then, we process the old population. If the SFH is shorter than the
-        # separation age then all the arrays will consist only of 0.
-        old_sfh = np.copy(sfh_sfr)
-        old_sfh[sfh_age <= separation_age] = 0
-        old_masses, old_spectrum = ssp.convolve(sfh_time, old_sfh)
+        out = self.convolve(sed.sfh)
+        spec_young, spec_old, info_young, info_old, info_all = out
+        lum_young, lum_old = np.trapz([spec_young, spec_old], self.ssp.wl)
+        lum_ly_young, lum_ly_old = np.trapz(
+            [spec_young[self.mask_Q], spec_old[self.mask_Q]], self.wvl_H
+        )
+        NLy_young, NLy_old = np.trapz([self.wvl_H * spec_young[self.mask_Q],
+                                       self.wvl_H * spec_old[self.mask_Q]],
+                                       x=self.wvl_H) * self.invhc * 1e-9
 
         sed.add_module(self.name, self.parameters)
 
-        sed.add_info('stellar.imf', imf)
-        sed.add_info('stellar.metallicity', metallicity)
-        sed.add_info('stellar.old_young_separation_age', separation_age)
+        sed.add_info('stellar.imf', self.imf)
+        sed.add_info('stellar.metallicity', self.Z)
+        sed.add_info('stellar.old_young_separation_age', self.separation_age,
+                     unit='Myr')
 
-        sed.add_info('stellar.mass_total_old', old_masses[0], True)
-        sed.add_info('stellar.mass_alive_old', old_masses[1], True)
-        sed.add_info('stellar.mass_white_dwarf_old', old_masses[2], True)
-        sed.add_info('stellar.mass_neutron_old', old_masses[3], True)
-        sed.add_info('stellar.mass_black_hole_old', old_masses[4], True)
+        sed.add_info('stellar.mass_total_young', info_young[0], True,
+                     unit='solMass')
+        sed.add_info('stellar.mass_alive_young', info_young[1], True,
+                     unit='solMass')
+        sed.add_info('stellar.mass_white_dwarf_young', info_young[2], True,
+                     unit='solMass')
+        sed.add_info('stellar.mass_neutron_young', info_young[3], True,
+                     unit='solMass')
+        sed.add_info('stellar.mass_black_hole_young', info_young[4], True,
+                     unit='solMass')
+        sed.add_info('stellar.lum_young', lum_young, True, unit='W')
+        sed.add_info("stellar.lum_ly_young", lum_ly_young, True, unit='W')
+        sed.add_info("stellar.n_ly_young", NLy_young, True,
+                     unit='ph/s')
 
-        sed.add_info('stellar.mass_total_young', young_masses[0], True)
-        sed.add_info('stellar.mass_alive_young', young_masses[1], True)
-        sed.add_info('stellar.mass_white_dwarf_young', young_masses[2], True)
-        sed.add_info('stellar.mass_neutron_young', young_masses[3], True)
-        sed.add_info('stellar.mass_black_hole_young', young_masses[4], True)
+        sed.add_info('stellar.mass_total_old', info_old[0], True,
+                     unit='solMass')
+        sed.add_info('stellar.mass_alive_old', info_old[1], True,
+                     unit='solMass')
+        sed.add_info('stellar.mass_white_dwarf_old', info_old[2], True,
+                     unit='solMass')
+        sed.add_info('stellar.mass_neutron_old', info_old[3], True,
+                     unit='solMass')
+        sed.add_info('stellar.mass_black_hole_old', info_old[4], True,
+                     unit='solMass')
+        sed.add_info('stellar.lum_old', lum_old, True, unit='W')
+        sed.add_info("stellar.lum_ly_old", lum_ly_old, True, unit='W')
+        sed.add_info("stellar.n_ly_old", NLy_old, True,
+                     unit='ph/s')
 
-        sed.add_info('stellar.mass_total',
-                     old_masses[0] + young_masses[0], True)
-        sed.add_info('stellar.mass_alive',
-                     old_masses[1] + young_masses[1], True)
-        sed.add_info('stellar.mass_white_dwarf',
-                     old_masses[2] + young_masses[2], True)
-        sed.add_info('stellar.mass_neutron',
-                     old_masses[3] + young_masses[3], True)
-        sed.add_info('stellar.mass_black_hole',
-                     old_masses[4] + young_masses[4], True)
+        sed.add_info('stellar.mass_total', info_all[0], True, unit='solMass')
+        sed.add_info('stellar.mass_alive', info_all[1], True, unit='solMass')
+        sed.add_info('stellar.mass_white_dwarf', info_all[2], True,
+                     unit='solMass')
+        sed.add_info('stellar.mass_neutron', info_all[3], True, unit='solMass')
+        sed.add_info('stellar.mass_black_hole', info_all[4], True,
+                     unit='solMass')
+        sed.add_info('stellar.age_mass', info_all[5], unit='Myr')
+        sed.add_info('stellar.lum', lum_young + lum_old, True, unit='W')
+        sed.add_info("stellar.lum_ly", lum_ly_young + lum_ly_old, True,
+                     unit='W')
+        sed.add_info("stellar.n_ly", NLy_young + NLy_old, True,
+                     unit='ph/s')
 
-        sed.add_contribution("stellar.old",
-                             ssp.wavelength_grid,
-                             old_spectrum)
-        sed.add_contribution("stellar.young",
-                             ssp.wavelength_grid,
-                             young_spectrum)
+        sed.add_contribution("stellar.old", self.ssp.wl, spec_old)
+        sed.add_contribution("stellar.young", self.ssp.wl, spec_young)
 
-# CreationModule to be returned by get_module
+
 Module = M2005

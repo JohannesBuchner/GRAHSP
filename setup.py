@@ -7,6 +7,13 @@ from distutils.command.build import build
 
 from setuptools import find_packages, setup
 
+if 'SPEED' not in os.environ:
+    raise Exception("""
+Set environment variable SPEED to one of:
+    2 -- quick and small GRAHSP install, 700MB
+    1 -- full physical agn models (Fritz,Netzer), 2800MB, or 
+    0 -- like 1 but also include non-solar metallicity galaxies and Draine&Li dust models), 3200MB, 
+""")
 
 class custom_build(build):
     def run(self):
@@ -15,7 +22,8 @@ class custom_build(build):
             os.unlink('pcigale/data/data.db')
         # Build the database.
         import database_builder
-        database_builder.build_base()
+        speed = int(os.environ['SPEED'])
+        database_builder.build_base(speed=speed)
 
         # Proceed with the build
         build.run(self)
@@ -27,7 +35,7 @@ entry_points = {
 
 setup(
     name="grahsp",
-    version="0.7.8",
+    version="0.8.0",
     packages=find_packages(exclude=["database_builder"]),
 
     install_requires=['numpy', 'scipy', 'sqlalchemy', 'matplotlib',

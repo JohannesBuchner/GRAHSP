@@ -5,22 +5,19 @@
 # Author: Yannick Roehlly, Véronique Buat & Médéric Boquien
 
 """
-Delayed tau model for star formation history
-============================================
+Delayed tau model for star formation history with an optional exponential burst
+===============================================================================
 
 This module implements a star formation history (SFH) described as a delayed
-rise of the SFR up to a maximum, followed by an exponential decrease.
+rise of the SFR up to a maximum, followed by an exponential decrease. Optionally
+a decreasing exponential burst can be added to model a recent episode of star
+formation.
 
 """
 
 from collections import OrderedDict
 import numpy as np
 from . import CreationModule
-
-# Time lapse used in the age grid in Myr. If should be consistent with the
-# time lapse in the SSP modules.
-AGE_LAPSE = 1
-
 
 class SFHDelayed(CreationModule):
     """Delayed tau model for Star Formation History
@@ -36,15 +33,31 @@ class SFHDelayed(CreationModule):
             "e-folding time of the main stellar population model in Myr.",
             2000.
         )),
-        ("age", (
+        ("age_main", (
             "integer",
             "Age of the oldest stars in the galaxy in Myr. The precision "
             "is 1 Myr.",
             5000.
         )),
+        ("tau_burst", (
+            "float",
+            "e-folding time of the late starburst population model in Myr.",
+            50.
+        )),
+        ("age_burst", (
+            "integer",
+            "Age of the late burst in Myr. The precision is 1 Myr.",
+            20.
+        )),
+        ("f_burst", (
+            "float",
+            "Mass fraction of the late burst population.",
+            0.
+        )),
         ("sfr_A", (
             "float",
-            "Multiplicative factor controlling the amplitude of SFR.",
+            "Multiplicative factor controlling the SFR if normalise is False. "
+            "For instance without any burst: SFR(t)=sfr_A×t×exp(-t/τ)/τ²",
             1.
         )),
         ("normalise", (
@@ -54,6 +67,44 @@ class SFHDelayed(CreationModule):
         ))
     ])
 
+    def _init_code(self):
+        self.tau_main = float(self.parameters["tau_main"])
+        self.age_main = int(self.parameters["age_main"])
+        self.tau_burst = float(self.parameters["tau_burst"])
+        self.age_burst = int(self.parameters["age_burst"])
+        self.f_burst = float(self.parameters["f_burst"])
+        sfr_A = float(self.parameters["sfr_A"])
+        if isinstance(self.parameters["normalise"], str):
+            normalise = self.parameters["normalise"].lower() == 'true'
+        else:
+            normalise = bool(self.parameters["normalise"])
+
+        # Time grid for each component
+        t = np.arange(self.age_main)
+        t_burst = np.arange(self.age_burst)
+
+        # SFR for each component
+        self.sfr = t * np.exp(-t / self.tau_main) / self.tau_main**2
+        sfr_burst = np.exp(-t_burst / self.tau_burst)
+
+        # Height of the late burst to have the desired produced mass fraction
+        sfr_burst *= (self.f_burst / (1. - self.f_burst) * np.sum(self.sfr) /
+                      np.sum(sfr_burst))
+
+        # We add the age burst exponential for ages superior to age_main -
+        # age_burst
+        self.sfr[-(t_burst[-1] + 1):] += sfr_burst
+
+        # Compute the integral of the SFH and normalise it to 1 solar mass
+        # if asked to.
+        self.sfr_integrated = np.sum(self.sfr) * 1e6
+        if normalise:
+            self.sfr /= self.sfr_integrated
+            self.sfr_integrated = 1.
+        else:
+            self.sfr *= sfr_A
+            self.sfr_integrated *= sfr_A
+
     def process(self, sed):
         """
         Parameters
@@ -61,33 +112,18 @@ class SFHDelayed(CreationModule):
         sed : pcigale.sed.SED object
 
         """
-        tau_main = float(self.parameters["tau_main"])
-        age = int(self.parameters["age"])
-        sfr_A = int(self.parameters["sfr_A"])
-        normalise = (self.parameters["normalise"].lower() == "true")
-
-        # Time grid and age. If needed, the age is rounded to the inferior Myr
-        time_grid = np.arange(AGE_LAPSE, age + AGE_LAPSE, AGE_LAPSE)
-
-        # Main SFR
-        sfr = time_grid / tau_main**2 * np.exp(-time_grid / tau_main)
-
-        # Compute the galaxy mass and normalise the SFH to 1 solar mass
-        # produced if asked to.
-        galaxy_mass = np.trapz(sfr, time_grid) * 1e6
-        if normalise:
-            sfr = sfr / galaxy_mass
-            galaxy_mass = 1.
-        else:
-            sfr *= sfr_A
-            galaxy_mass *= sfr_A
 
         sed.add_module(self.name, self.parameters)
 
         # Add the sfh and the output parameters to the SED.
-        sed.sfh = (time_grid, sfr)
-        sed.add_info("galaxy_mass", galaxy_mass, True)
-        sed.add_info("sfh.tau_main", tau_main)
+        sed.sfh = self.sfr
+        sed.add_info("sfh.integrated", self.sfr_integrated, True,
+                     unit='solMass')
+        sed.add_info("sfh.age_main", self.age_main, unit='Myr')
+        sed.add_info("sfh.tau_main", self.tau_main, unit='Myr')
+        sed.add_info("sfh.age_burst", self.age_burst, unit='Myr')
+        sed.add_info("sfh.tau_burst", self.tau_burst, unit='Myr')
+        sed.add_info("sfh.f_burst", self.f_burst)
 
 # CreationModule to be returned by get_module
 Module = SFHDelayed

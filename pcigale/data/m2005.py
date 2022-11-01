@@ -69,6 +69,11 @@ class M2005(object):
         self.wavelength_grid = wavelength_grid
         self.mass_table = mass_table
         self.spec_table = spec_table
+        # names for newer cigale code
+        self.info = self.mass_table
+        self.spec = self.spec_table
+        self.t = self.time_grid
+        self.wl = self.wavelength_grid
 
     def convolve(self, sfh_time, sfh_sfr):
         """Convolve the SSP with a Star Formation History

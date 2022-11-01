@@ -60,6 +60,11 @@ class BC03(object):
         self.wavelength_grid = wavelength_grid
         self.color_table = color_table
         self.lumin_table = lumin_table
+        # names for newer cigale code
+        self.info = self.color_table
+        self.spec = self.lumin_table
+        self.t = self.time_grid
+        self.wl = self.wavelength_grid
 
     def convolve(self, sfh_time, sfh_sfr):
         """Convolve the SSP with a Star Formation History
