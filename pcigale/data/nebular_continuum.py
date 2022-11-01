@@ -12,7 +12,7 @@ class NebularContinuum(object):
 
     """
 
-    def __init__(self, metallicity, logU, wave, lumin):
+    def __init__(self, metallicity, logU, ne, wave, lumin):
         """Create a new nebular lines template
 
         Parameters
@@ -21,6 +21,8 @@ class NebularContinuum(object):
             Gas phase metallicity
         logU: float
             Ionisation parameter
+        ne: float
+            Electron density
         wave: array
             Vector of the λ grid used in the templates [nm]
         lumin: array
@@ -30,5 +32,6 @@ class NebularContinuum(object):
 
         self.metallicity = metallicity
         self.logU = logU
+        self.ne = ne
         self.wave = wave
         self.lumin = lumin

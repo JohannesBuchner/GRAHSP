@@ -314,12 +314,14 @@ class _NebularLines(BASE):
     __tablename__ = 'nebular_lines'
     metallicity = Column(Float, primary_key=True)
     logU = Column(Float, primary_key=True)
+    ne = Column(Float, primary_key=True)
     wave = Column(PickleType)
     ratio = Column(PickleType)
 
     def __init__(self, nebular_lines):
         self.metallicity = nebular_lines.metallicity
         self.logU = nebular_lines.logU
+        self.ne = nebular_lines.ne
         self.wave = nebular_lines.wave
         self.ratio = nebular_lines.ratio
 
@@ -331,12 +333,14 @@ class _NebularContinuum(BASE):
     __tablename__ = 'nebular_continuum'
     metallicity = Column(Float, primary_key=True)
     logU = Column(Float, primary_key=True)
+    ne = Column(Float, primary_key=True)
     wave = Column(PickleType)
     lumin = Column(PickleType)
 
     def __init__(self, nebular_continuum):
         self.metallicity = nebular_continuum.metallicity
         self.logU = nebular_continuum.logU
+        self.ne = nebular_continuum.ne
         self.wave = nebular_continuum.wave
         self.lumin = nebular_continuum.lumin
 
@@ -1056,7 +1060,7 @@ class Database(object):
         else:
             raise Exception('The database is not writable')
 
-    def get_nebular_lines(self, metallicity, logU):
+    def get_nebular_lines(self, metallicity, logU, ne):
         """
         Get the line ratios corresponding to the given set of parameters.
 
@@ -1070,9 +1074,10 @@ class Database(object):
         result = (self.session.query(_NebularLines).
                   filter(_NebularLines.metallicity == metallicity).
                   filter(_NebularLines.logU == logU).
+                  filter(_NebularLines.ne == ne).
                   first())
         if result:
-            return NebularLines(result.metallicity, result.logU, result.wave,
+            return NebularLines(result.metallicity, result.logU, result.ne, result.wave,
                                 result.ratio)
         else:
             return None
@@ -1102,7 +1107,7 @@ class Database(object):
         else:
             raise Exception('The database is not writable')
 
-    def get_nebular_continuum(self, metallicity, logU):
+    def get_nebular_continuum(self, metallicity, logU, ne):
         """
         Get the nebular continuum corresponding to the given set of parameters.
 
@@ -1116,9 +1121,10 @@ class Database(object):
         result = (self.session.query(_NebularContinuum).
                   filter(_NebularContinuum.metallicity == metallicity).
                   filter(_NebularContinuum.logU == logU).
+                  filter(_NebularContinuum.ne == ne).
                   first())
         if result:
-            return NebularContinuum(result.metallicity, result.logU,
+            return NebularContinuum(result.metallicity, result.logU, result.ne,
                                     result.wave, result.lumin)
         else:
             return None

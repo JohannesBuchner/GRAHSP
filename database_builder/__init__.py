@@ -19,6 +19,7 @@ import itertools
 import numpy as np
 from scipy import interpolate
 import scipy.constants as cst
+from astropy.table import Table
 from pcigale.data import (Database, Filter, M2005, BC03, Fritz2006,
                           Dale2014, DL2007, DL2014, NebularLines,
                           NebularContinuum, 
@@ -893,69 +894,117 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
     assert (data['LINER'] >= 0).all(), data
     base.add_ActivateMorNetzerEmLines(MorNetzerEmLines(data['wave'] * 0.1, data['broad'], data['S2'], data['LINER']))
     
+default_lines = set([
+        "ArIII-713.6",
+        "CII-232.4",
+        "CII-232.47",
+        "CII-232.54",
+        "CII-232.7",
+        "CII-232.8",
+        "CIII-190.7",
+        "CIII-190.9",
+        "H-alpha",
+        "H-beta",
+        "H-delta",
+        "H-gamma",
+        "HeII-164.0",
+        "Ly-alpha",
+        "NII-654.8",
+        "NII-658.3",
+        "NeIII-396.7",
+        "OI-630.0",
+        "OII-372.6",
+        "OII-372.9",
+        "OIII-495.9",
+        "OIII-500.7",
+        "Pa-alpha",
+        "Pa-beta",
+        "Pa-gamma",
+        "SII-671.6",
+        "SII-673.1",
+        "SIII-906.9",
+        "SIII-953.1",
+])
+
 def build_nebular(base):
-    lines_dir = os.path.join(os.path.dirname(__file__), 'nebular/')
+    path = os.path.join(os.path.dirname(__file__), 'nebular/')
 
-    # Number of Lyman continuum photon to normalize the nebular continuum
-    # templates
-    nlyc_continuum = {'0.0001': 2.68786E+53, '0.0004': 2.00964E+53,
-                      '0.004': 1.79593E+53, '0.008': 1.58843E+53,
-                      '0.02': 1.24713E+53, '0.05': 8.46718E+52}
+    filename = os.path.join(path, "lines.dat")
+    print(f"Importing {filename}...")
+    lines = np.genfromtxt(filename)
 
-    for Z in ['0.0001', '0.0004', '0.004', '0.008', '0.02', '0.05']:
-        filename = "{}lines_{}.dat".format(lines_dir, Z)
-        print("Importing {}...".format(filename))
-        wave, ratio1, ratio2, ratio3 = np.genfromtxt(filename, unpack=True,
-                                                     usecols=(0, 3, 7, 11))
+    tmp = Table.read(os.path.join(path, "line_wavelengths.dat"), format='ascii')
+    name_lines = tmp['col2'].data
+    mask_lines = np.array([name_line in default_lines for name_line in name_lines])
+    mask_lines[:] = True
+    wave_lines = tmp['col1'].data[mask_lines]
+    name_lines = name_lines[mask_lines]
+    print(mask_lines.shape, mask_lines.sum(), name_lines.shape)
 
-        # Convert wavelength from Å to nm
-        wave *= 0.1
+    # Build the parameters
+    metallicities = np.unique(lines[:, 1])
+    logUs = np.around(np.arange(-4., -.9, .1), 1)
+    nes = np.array([10., 100., 1000.])
 
-        # Convert log(flux) into flux (arbitrary units)
-        ratio1 = 10**(ratio1-38.)
-        ratio2 = 10**(ratio2-38.)
-        ratio3 = 10**(ratio3-38.)
+    filename = os.path.join(path, "continuum.dat")
+    print(f"Importing {filename}...")
+    cont = np.genfromtxt(filename)
 
-        # Normalize all lines to Hβ
-        w = np.where(wave == 486.1)
-        ratio1 = ratio1/ratio1[w]
-        ratio2 = ratio2/ratio2[w]
-        ratio3 = ratio3/ratio3[w]
+    # Convert wavelength from Å to nm
+    wave_lines *= 0.1
+    wave_cont = cont[:1600, 0] * 0.1
 
-        lines = NebularLines(np.float(Z), -3., wave, ratio1)
-        base.add_nebular_lines(lines)
+    # Compute the wavelength grid to resample the models so as to eliminate
+    # non-physical waves and compute the models faster by avoiding resampling
+    # them at run time.
+    
+    wave_stellar = base.get_bc03(imf="salp", metallicity=0.02).wl
+    wave_dust = base.get_dl2014(qpah=0.47, umin=1., umax=1., alpha=1.).wave
+    wave_cont_interp = np.unique(np.hstack([wave_cont, wave_stellar, wave_dust,
+                                            np.logspace(7., 9., 501)]))
 
-        lines = NebularLines(np.float(Z), -2., wave, ratio2)
-        base.add_nebular_lines(lines)
+    print(lines.shape, cont.shape)
+    # Keep only the fluxes
+    lines = lines[:, 2:]
+    cont = cont[:, 1:]
 
-        lines = NebularLines(np.float(Z), -1., wave, ratio3)
-        base.add_nebular_lines(lines)
+    # Reshape the arrays so they are easier to handle
+    cont = np.reshape(cont, (metallicities.size, wave_cont.size, logUs.size,
+                             nes.size))
+    lines = np.reshape(lines, (mask_lines.size, metallicities.size, logUs.size,
+                               nes.size))[mask_lines,:,:,:]
 
-        filename = "{}continuum_{}.dat".format(lines_dir, Z)
-        print("Importing {}...".format(filename))
-        wave, cont1, cont2, cont3 = np.genfromtxt(filename, unpack=True,
-                                                  usecols=(0, 3, 7, 11))
+    # Move the wavelength to the last position to ease later computations
+    # 0: metallicity, 1: log U, 2: ne, 3: wavelength
+    cont = np.moveaxis(cont, 1, -1)
+    lines = np.moveaxis(lines, (0, 1, 2, 3), (3, 0, 1, 2))
 
-        # Convert wavelength from Å to nm
-        wave *= 0.1
+    # Convert lines to a linear scale
+    lines = 10.0 ** lines
 
-        # Normalize flux from erg s¯¹ Hz¯¹ (Msun/yr)¯¹ to W nm¯¹ photon¯¹ s¯¹
-        conv = 1e-7 * cst.c * 1e9 / (wave * wave) / nlyc_continuum[Z]
-        cont1 *= conv
-        cont2 *= conv
-        cont3 *= conv
+    # Convert continuum to W/nm
+    cont *= 1e-7 * cst.c * 1e9 / wave_cont**2
 
-        cont = NebularContinuum(np.float(Z), -3., wave, cont1)
-        base.add_nebular_continuum(cont)
+    # Import lines
+    for idxZ, metallicity in enumerate(metallicities):
+        for idxU, logU in enumerate(logUs):
+            for ne, spectrum in zip(nes, lines[idxZ, idxU, :, :]):
+                line = NebularLines(np.float(metallicity), float(logU), float(ne), wave_lines, spectrum)
+                base.add_nebular_lines(line)
 
-        cont = NebularContinuum(np.float(Z), -2., wave, cont2)
-        base.add_nebular_continuum(cont)
+    # Import continuum
+    #db = SimpleDatabase("nebular_continuum", writable=True)
+    spectra = 10 ** interpolate.interp1d(np.log10(wave_cont), np.log10(cont),
+                                         axis=-1)(np.log10(wave_cont_interp))
+    spectra = np.nan_to_num(spectra)
+    for idxZ, metallicity in enumerate(metallicities):
+        for idxU, logU in enumerate(logUs):
+            for ne, spectrum in zip(nes, spectra[idxZ, idxU, :, :]):
+                cont = NebularContinuum(np.float(metallicity), float(logU), float(ne), wave_cont_interp, spectrum)
+                base.add_nebular_continuum(cont)
 
-        cont = NebularContinuum(np.float(Z), -1., wave, cont3)
-        base.add_nebular_continuum(cont)
 
-
-def build_base_full():
+def build_base(speed):
     base = Database(writable=True)
     base.upgrade_base()
     
