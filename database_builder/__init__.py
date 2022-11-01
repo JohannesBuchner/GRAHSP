@@ -24,7 +24,7 @@ from pcigale.data import (Database, Filter, M2005, BC03, Fritz2006,
                           Dale2014, DL2007, DL2014, NebularLines,
                           NebularContinuum, 
                           NetzerDisk, Pacifici2012Gal, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines,
-                          ExtinctionLaw)
+                          AttenuationLaw)
 
 
 def read_bc03_ssp(filename):
@@ -700,7 +700,7 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
     data = np.genfromtxt(filename)
     wave = data[:,0] / 10. # A to nm
     k = data[:,1]
-    base.add_ExtinctionLaw(ExtinctionLaw("Prevot", wave, k))
+    base.add_AttenuationLaw(AttenuationLaw("Prevot", wave, k))
     del data, wave, k
     
     # galaxy template by Camilla Pacifici

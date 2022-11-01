@@ -28,7 +28,7 @@ from .dl2007 import DL2007
 from .dl2014 import DL2014
 from .fritz2006 import Fritz2006
 from .activate import NetzerDisk, MorNetzer2012Torus, Pacifici2012Gal, FeIIferland, MorNetzerEmLines
-from .extinction import ExtinctionLaw
+from .attenuation import AttenuationLaw
 from .nebular_continuum import NebularContinuum
 from .nebular_lines import NebularLines
 
@@ -213,10 +213,10 @@ class _Fritz2006(BASE):
         self.lumin_scatt = agn.lumin_scatt
         self.lumin_agn = agn.lumin_agn
 
-class _ExtinctionLaw(BASE):
-    """Storage for ExtinctionLaw """
+class _AttenuationLaw(BASE):
+    """Storage for AttenuationLaw """
 
-    __tablename__ = 'ExtinctionLaw'
+    __tablename__ = 'AttenuationLaw'
     name = Column(String, primary_key=True)
     wave = Column(PickleType)
     k = Column(PickleType)
@@ -806,18 +806,18 @@ class Database(object):
 
 # ----------- begin activate code
 
-    def add_ExtinctionLaw(self, law):
+    def add_AttenuationLaw(self, law):
         """
         Add ExtinctionLaw to the database.
         """
         if self.is_writable:
-            self.session.add(_ExtinctionLaw(law))
+            self.session.add(_AttenuationLaw(law))
             try:
                 self.session.commit()
             except exc.IntegrityError:
                 self.session.rollback()
                 raise DatabaseInsertError(
-                    'The ExtinctionLaw model is already in the base.')
+                    'The AttenuationLaw model is already in the base.')
         else:
             raise Exception('The database is not writable.')
 
@@ -946,16 +946,16 @@ class Database(object):
         """
         return self._get_parameters(_ActivateNetzerDisk)
 
-    def get_ExtinctionLaw(self, name):
-        """Get the ExtinctionLaw model """
-        result = (self.session.query(_ExtinctionLaw).filter(_ExtinctionLaw.name == name).first())
+    def get_AttenuationLaw(self, name):
+        """Get the AttenuationLaw model """
+        result = (self.session.query(_AttenuationLaw).filter(_AttenuationLaw.name == name).first())
         if result:
-            return ExtinctionLaw(name, result.wave, result.k)
+            return AttenuationLaw(name, result.wave, result.k)
         else:
             raise DatabaseLookupError(
-                "The ExtinctionLaw model is not in the database.")
+                "The AttenuationLaw model is not in the database.")
 
-    def get_ExtinctionLaw_parameters(self):
+    def get_AttenuationLaw_parameters(self):
         """Get parameters for ExtinctionLaw models.
 
         Returns
@@ -963,7 +963,7 @@ class Database(object):
         paramaters: dictionary
             dictionary of parameters and their values
         """
-        return self._get_parameters(_ExtinctionLaw)
+        return self._get_parameters(_AttenuationLaw)
 
 
     def get_ActivatePacifici2012Gal(self, name):

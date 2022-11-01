@@ -5,8 +5,8 @@
 
 # NetzerDisk, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines
 
-class ExtinctionLaw(object):
-    """Extinction law model """
+class AttenuationLaw(object):
+    """Attenuation law model """
 
     def __init__(self, name, wave, k):
         """Create a new extinction law"""
@@ -14,5 +14,3 @@ class ExtinctionLaw(object):
         self.name = name
         self.wave = wave
         self.k = k
-
-
