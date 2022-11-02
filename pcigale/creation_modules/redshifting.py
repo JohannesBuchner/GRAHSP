@@ -23,7 +23,7 @@ from scipy.constants import parsec
 from scipy.special import factorial
 
 from ..creation_modules import CreationModule
-from astropy.cosmology import WMAP7 as cosmology
+from astropy.cosmology import Planck18 as cosmology
 
 def igm_transmission_cached(wavelength, redshift):
     """ memoize pure igm_transmission function """
