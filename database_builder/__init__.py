@@ -939,7 +939,6 @@ def build_nebular(base):
     mask_lines[:] = True
     wave_lines = tmp['col1'].data[mask_lines]
     name_lines = name_lines[mask_lines]
-    print(mask_lines.shape, mask_lines.sum(), name_lines.shape)
 
     # Build the parameters
     metallicities = np.unique(lines[:, 1])
@@ -963,7 +962,6 @@ def build_nebular(base):
     wave_cont_interp = np.unique(np.hstack([wave_cont, wave_stellar, wave_dust,
                                             np.logspace(7., 9., 501)]))
 
-    print(lines.shape, cont.shape)
     # Keep only the fluxes
     lines = lines[:, 2:]
     cont = cont[:, 1:]
