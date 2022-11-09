@@ -23,7 +23,8 @@ from scipy.constants import parsec
 from scipy.special import factorial
 
 from ..creation_modules import CreationModule
-from astropy.cosmology import Planck18 as cosmology
+import astropy.cosmology
+cosmology = astropy.cosmology.FlatLambdaCDM(70, 0.3)
 
 def igm_transmission_cached(wavelength, redshift):
     """ memoize pure igm_transmission function """

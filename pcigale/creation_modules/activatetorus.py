@@ -90,7 +90,7 @@ class ActivateTorus(CreationModule):
         sed.add_contribution('agn.activate_TorusSi', self.si.wave, si_spectrum)
         l_torus_6um = np.interp(6000., self.torus_avg.wave, torus_spectrum)
         l_si_6um = np.interp(6000., self.si.wave, si_spectrum)
-        sed.add_info('agn.lum6um', l_torus_6um + l_si_6um, True)
+        sed.add_info('agn.lum6um', (l_torus_6um + l_si_6um) * 6 / 0.510, True)
     
 # CreationModule to be returned by get_module
 Module = ActivateTorus
