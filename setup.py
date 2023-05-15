@@ -35,7 +35,7 @@ entry_points = {
 
 setup(
     name="grahsp",
-    version="0.9.1",
+    version="0.10.0",
     packages=find_packages(exclude=["database_builder"]),
 
     install_requires=['numpy', 'scipy', 'sqlalchemy', 'matplotlib',
