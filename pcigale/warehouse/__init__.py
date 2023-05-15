@@ -15,13 +15,15 @@ class SedWarehouse(object):
     cache or a database.
     """
 
-    def __init__(self, cache_type="memory"):
+    def __init__(self, cache_type="memory", store_depth=-1):
         """Instantiate a SED warehouse
 
         Parameters
         ----------
         cache_type: string
             Type of cache used. For now, only in memory caching.
+        store_depth: int
+            store SED objects from modules up to this depth. -1 means unlimited.
         """
         if cache_type == "memory":
             from .store.memory import SedStore
@@ -29,6 +31,7 @@ class SedWarehouse(object):
             from .store.shelf import SedStore
 
         self.storage = SedStore()
+        self.store_depth = store_depth
 
         # Cache for modules
         self.module_cache = {}
@@ -130,7 +133,8 @@ class SedWarehouse(object):
                 sed = self.get_sed(module_list, parameter_list)
 
             mod.process(sed)
-            self.storage.add(sed_key, sed)
+            if self.store_depth < 0 or len(module_list) < self.store_depth:
+                self.storage.add(sed_key, sed)
 
         return sed
 
