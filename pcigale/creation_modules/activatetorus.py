@@ -4,21 +4,19 @@
 # Author: Johannes Buchner
 
 """
-Activate AGN module
+Activate AGN torus module
 ==================================================
 
-This module adds line emissions.
+This module adds the "torus" mid-infrared emission.
 
 """
 from collections import OrderedDict
 import numpy as np
 from pcigale.data import Database
 from . import CreationModule
-import scipy.constants as cst
         
 class ActivateTorus(CreationModule):
-    """Activate AGN Emission lines (BL, Sy2 or LINER), and FeII forest
-    """
+    """Activate torus."""
 
     parameter_list = OrderedDict([
         ('fcov', (
@@ -35,6 +33,11 @@ class ActivateTorus(CreationModule):
             'float',
             "Steepness of the torus spectrum (relative to the spread in Mor&Netzer+09). -3 to 3 is reasonable.",
             0.
+        )),
+        ('TORcutoff', (
+            'float',
+            "Wavelength cutoff in um.",
+            1.2
         ))
     ])
 
@@ -55,14 +58,13 @@ class ActivateTorus(CreationModule):
         Parameters
         ----------
         sed: pcigale.sed.SED object
-        parameters: dictionary containing the parameters
-
         """
 
         fcov = self.parameters["fcov"]
         # agnType = self.parameters["AGNtype"]
         Si = self.parameters["Si"]
         TORtemp = self.parameters["TORtemp"]
+        TORcut = self.parameters["TORcutoff"]
 
         l_agn = sed.info['agn.lum5100A']
         
@@ -70,6 +72,7 @@ class ActivateTorus(CreationModule):
         sed.add_info('agn.fcov', self.parameters["fcov"])
         sed.add_info('agn.Si', self.parameters["Si"])
         sed.add_info('agn.TORtemp', self.parameters["TORtemp"])
+        sed.add_info('agn.TORcutoff', self.parameters["TORcutoff"])
 
         
         # Add torus for NIR-MIR continuum
@@ -83,8 +86,12 @@ class ActivateTorus(CreationModule):
             torus_deviation = (self.torus_hi.lumin - self.torus_avg.lumin) * TORtemp
         else:
             torus_deviation = (self.torus_lo.lumin - self.torus_avg.lumin) * -TORtemp
+        
+        # gaussian-like cut-off at low wavelengths
+        # approximates Lyu&Rieke (TORcut=1.7) templates and Mor&Netzer (TORcut=1.2) templates
+        cutoff = 1 - np.exp( - (self.torus_avg.wave / TORcut)**2)
 
-        torus_spectrum = l_torus * (self.torus_avg.lumin + torus_deviation)
+        torus_spectrum = l_torus * (self.torus_avg.lumin + torus_deviation) * cutoff
         sed.add_contribution('agn.activate_Torus', self.torus_avg.wave, torus_spectrum)
         si_spectrum = l_torus * self.si.lumin * Si
         sed.add_contribution('agn.activate_TorusSi', self.si.wave, si_spectrum)

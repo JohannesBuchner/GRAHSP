@@ -4,14 +4,13 @@
 # Author: Johannes Buchner
 
 """
-Activate AGN module
+Activate AGN disk module
 ==================================================
 
-This module combines disk and torus.
+This module adds a physical disk model.
 
 """
 from collections import OrderedDict
-import numpy as np
 from pcigale.data import Database
 from . import CreationModule
 
@@ -67,7 +66,6 @@ class ActivateDisk(CreationModule):
         Parameters
         ----------
         sed: pcigale.sed.SED object
-        parameters: dictionary containing the parameters
 
         """
 

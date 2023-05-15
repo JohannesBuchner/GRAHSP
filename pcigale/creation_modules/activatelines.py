@@ -4,7 +4,7 @@
 # Author: Johannes Buchner
 
 """
-Activate AGN module
+Activate AGN lines module
 ==================================================
 
 This module adds line emissions.
@@ -77,12 +77,11 @@ class ActivateLines(CreationModule):
         self.new_wave = new_wave
 
     def process(self, sed):
-        """Add the AGN contributions
+        """Add the line contributions
 
         Parameters
         ----------
         sed: pcigale.sed.SED object
-        parameters: dictionary containing the parameters
 
         """
 

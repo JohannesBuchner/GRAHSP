@@ -7,7 +7,7 @@
 Activate AGN module
 ==================================================
 
-This module combines disk and torus.
+This module prepares the use of activate AGN components.
 
 """
 from collections import OrderedDict

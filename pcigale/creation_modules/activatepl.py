@@ -4,7 +4,7 @@
 # Author: Johannes Buchner
 
 """
-Activate Powerlaw AGN module
+Activate AGN powerlaw module
 ==================================================
 
 This module uses a simple powerlaw for the BBB,

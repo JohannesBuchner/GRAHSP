@@ -813,14 +813,10 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
         norm = Llam[wave == 12000][0] # get normalisation at 12um
         assert norm > 0, (norm, Llam)
         Llam = Llam / norm
-        mask = wave > 1000 # model is valid above 1um
-        # extrapolate with the shortest wavelength data points 
-        # using to a power law to even shorter wavelengths.
-        i = np.where(mask)[0][0]
-        polycoef = np.polyfit(np.log10(wave[i:i+4]), np.log10(Llam[i:i+4]), 2)
-        poly = np.poly1d(polycoef)
-        #Llam[~mask] = Llam[i] * 10**(np.log10(Llam[i+1] / Llam[i]) * np.log10(wave[~mask] / wave[i]) / np.log10(wave[i+1] / wave[i]))
-        Llam[~mask] = 10**poly(np.log10(wave[~mask]))
+        # model is valid above 1um
+        # here we only pick above 2um, and then extrapolate 
+        mask = wave > 2000
+        Llam[~mask] = Llam[mask][0]
         assert (Llam >= 0).all(), Llam
         base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(torustype, wave, Llam))
         del Llam, mask, norm, wave
