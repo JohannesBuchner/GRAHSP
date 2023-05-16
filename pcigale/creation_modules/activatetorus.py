@@ -89,7 +89,7 @@ class ActivateTorus(CreationModule):
         
         # gaussian-like cut-off at low wavelengths
         # approximates Lyu&Rieke (TORcut=1.7) templates and Mor&Netzer (TORcut=1.2) templates
-        cutoff = 1 - np.exp( - (self.torus_avg.wave / TORcut)**2)
+        cutoff = 1 - np.exp( - (self.torus_avg.wave / 1000 / TORcut)**2)
 
         torus_spectrum = l_torus * (self.torus_avg.lumin + torus_deviation) * cutoff
         sed.add_contribution('agn.activate_Torus', self.torus_avg.wave, torus_spectrum)
