@@ -52,7 +52,7 @@ class BiAttenuationLaw(CreationModule):
             "Filters for which the attenuation will be computed and added to "
             "the SED information dictionary. You can give several filter "
             "names separated by a & (don't use commas).",
-            "V_B90 & FUV"
+            ""
         ))
     ])
     store_filter_attenuation = True
@@ -62,8 +62,11 @@ class BiAttenuationLaw(CreationModule):
         # We cannot compute the attenuation until we know the wavelengths. Yet,
         # we reserve the object.
         law = self.parameters["Law"]
-        self.filter_list = [item.strip() for item in
-                            self.parameters["filters"].split("&")]
+        if self.parameters["filters"].strip() != '':
+            self.filter_list = [item.strip() for item in
+                                self.parameters["filters"].split("&")]
+        else:
+            self.filter_list = []
 
         with Database() as base:
             self.law = base.get_AttenuationLaw(law)
@@ -79,10 +82,6 @@ class BiAttenuationLaw(CreationModule):
         sed: pcigale.sed.SED object
 
         """
-        # sed.wavelength_grid
-        # sed.luminosity
-        
-        
         wavelength = sed.wavelength_grid
 
         if self.store_filter_attenuation:
