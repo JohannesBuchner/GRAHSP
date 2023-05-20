@@ -39,9 +39,9 @@ class ActivateLines(CreationModule):
             "Use 1000 if you do not attempt to resolve the lines.",
             5000
         )),
-        ('linestrength_boost_factor', (
+        ('Alines', (
             'float',
-            "factor to multiply Netzer's typical equivalent widths",
+            "Factor to multiply Netzer's typical equivalent widths.",
             1
         )),
     ])
@@ -76,6 +76,10 @@ class ActivateLines(CreationModule):
         new_wave.sort()
         self.new_wave = new_wave
 
+        self.agnType = self.parameters["AGNtype"]
+        self.AFeII = self.parameters["AFeII"]
+        self.Alines = self.parameters["Alines"]
+
     def process(self, sed):
         """Add the line contributions
 
@@ -85,45 +89,47 @@ class ActivateLines(CreationModule):
 
         """
 
-        l_agn = sed.info['agn.lum5100A']
-        agnType = self.parameters["AGNtype"]
-        AFeII = self.parameters["AFeII"]
-        linestrength_boost_factor = self.parameters["linestrength_boost_factor"]
+        self.l_agn = sed.info['agn.lum5100A']
+        l_broadlines = 0.02 * self.l_agn * self.Alines
+        l_narrowlines = 0.002 * self.l_agn * self.Alines
         
         sed.add_module(self.name, self.parameters)
-        sed.add_info('agn.AFeII', AFeII)
-        sed.add_info('agn.type', agnType)
+        sed.add_info('agn.AFeII', self.AFeII)
+        sed.add_info('agn.Alines', self.Alines)
+        sed.add_info('agn.type', self.agnType)
 
-        l_broadlines = 0.02 * l_agn * linestrength_boost_factor
-        l_narrowlines = 0.002 * l_agn * linestrength_boost_factor
-        if agnType == 1: # BLAGN
+        if self.agnType == 1: # BLAGN
             self.add_lines(sed, 'agn.activate_EmLines_BL', self.emLines.wave,
                                  l_broadlines * self.emLines.lumin_BLAGN)
             self.add_lines(sed, 'agn.activate_EmLines_NL', self.emLines.wave,
                                  l_narrowlines * self.emLines.lumin_Sy2)
             # use FeII as well
-            l_fe2 = AFeII * l_broadlines
+            l_fe2 = self.AFeII * l_broadlines
             sed.add_contribution('agn.activate_FeLines', self.fe2.wave,
                                  l_fe2 * self.fe2.lumin)
-        elif agnType == 2: # Sy2
+        elif self.agnType == 2: # Sy2
             self.add_lines(sed, 'agn.activate_EmLines_NL', self.emLines.wave,
                                  l_narrowlines * self.emLines.lumin_Sy2)
             sed.add_contribution('agn.activate_FeLines', self.fe2.wave, 0 * self.fe2.lumin)
-        elif agnType == 3: # LINER
+        elif self.agnType == 3: # LINER
             self.add_lines(sed, 'agn.activate_EmLines_LINER', self.emLines.wave,
                                  l_narrowlines * self.emLines.lumin_LINER)
             sed.add_contribution('agn.activate_FeLines', self.fe2.wave, 0 * self.fe2.lumin)
     
     def add_lines(self, sed, name, wave, lumin):
-        """ make small gaussian lines out of the delta function information """
-        # prev:
-        # sed.add_contribution(name, wave, lumin)
-        
+        """add Gaussian lines to SED.
+
+        Parameters
+        ----------
+        sed: pcigale.sed.SED object
+        name (str): name of the contribution
+        wave: array of wavelengths of the lines
+        lumin: array of equivalent widths of the lines
+        """
         # all widths are FWHM, so
         # sigma = width / (2 * sqrt(2 * log(2)))
+        # the amplitude is computed from width, EW and luminosity.
         
-        # we do not attempt to resolve the lines
-        # so choose something very small here
         new_wave = self.new_wave
         new_lumin = np.zeros_like(new_wave)
         for line_flux, line_wave in zip(lumin, wave):
