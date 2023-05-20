@@ -179,25 +179,8 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
                     ax1.loglog(wavelength_spec[wsed],
                                (sed['stellar.old'][wsed] +
                                 sed['stellar.young'][wsed]),
-                               label="Stellar unattenuated", color='b', marker=None,
+                               label="Stellar unattenuated", color='orange', marker=None,
                                nonposy='clip', linestyle='--', linewidth=0.5)
-            if 'gal.Pacifici2012' in sed.columns:
-                template_index = int(float(props['gal.Pacifici2012.template']))
-                if template_index > 1000:
-                   template_name = 'sf%d' % (template_index - 1000)
-                else:
-                   template_name = 'qui%d' % (template_index)
-                
-                ax1.loglog(wavelength_spec[wsed],
-                    sed['gal.Pacifici2012'][wsed] + sed['attenuation.gal.Pacifici2012'][wsed],
-                    label="Pacifici2012/%s attenuated E(B-V)=%s" % (template_name, props['attenuation.ebv']), color='cyan',
-                    marker=None, nonposy='clip', linestyle='-',
-                    linewidth=0.5)
-                ax1.loglog(wavelength_spec[wsed],
-                    sed['gal.Pacifici2012'][wsed],
-                    label="Pacifici2012/%s unattenuated " % template_name, color='cyan',
-                    marker=None, nonposy='clip', linestyle='-',
-                    linewidth=0.5, alpha=0.3)
                 
             # Nebular emission
             if 'nebular.lines_young' in sed.columns:
