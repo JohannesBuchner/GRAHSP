@@ -15,7 +15,7 @@ class SedWarehouse(object):
     cache or a database.
     """
 
-    def __init__(self, cache_type="memory", store_depth=-1, uncached=[]):
+    def __init__(self, cache_type="memory", store_depth=-1, uncached=[], reusable=[]):
         """Instantiate a SED warehouse
 
         Parameters
@@ -36,6 +36,7 @@ class SedWarehouse(object):
         # Cache for modules
         self.module_cache = {}
         self.uncached = uncached
+        self.reusable = reusable
 
     def __enter__(self):
         return self
@@ -62,11 +63,17 @@ class SedWarehouse(object):
         # the module in the cache.
         if name in self.uncached:
             return creation_modules.get_module(name, **kwargs)
-        module_key = marshal.dumps((name, kwargs))
+        if name in self.reusable:
+            module_key = name
+        else:
+            module_key = marshal.dumps((name, kwargs))
 
         if module_key in self.module_cache:
             module = self.module_cache[module_key]
+            if name in self.reusable:
+                module.parameters.update(kwargs)
         else:
+            print("creating...", name, kwargs)
             module = creation_modules.get_module(name, **kwargs)
             self.module_cache[module_key] = module
 
