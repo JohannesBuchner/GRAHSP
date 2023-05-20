@@ -796,10 +796,10 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
     
     # Mor Netzer torus template
     print("Importing Activate MorNetzer2012Torus ...")
-    for filename, torustype, col in [
-        ('mor_netzer_mean_and_uncertainty_extended', 'mor-avg', 1),
-        ('mor_netzer_mean_and_uncertainty_extended', 'mor-lo', 2),
-        ('mor_netzer_mean_and_uncertainty_extended', 'mor-hi', 3),
+    for filename, torustype, col, factor in [
+        ('mor_netzer_mean_and_uncertainty_extended', 'mor-avg', 1, 0.51),
+        ('mor_netzer_mean_and_uncertainty_extended', 'mor-lo', 2, 0.36),
+        ('mor_netzer_mean_and_uncertainty_extended', 'mor-hi', 3, 0.73),
         # ('fuller_mean', 'type-2', 1, True)]:
     ]: 
         data = np.genfromtxt(activate_dir + "agn/mor_netzer_2012/" + filename)
@@ -808,7 +808,7 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
         nuLnu = data[:,col] # is multiplied by frequency
         
         #assert wave[0] == 510.0, wave[0] # normalisation
-        Llam = nuLnu / freq * c / wave**2 
+        Llam = nuLnu / freq * c / wave**2
         # normalise so that at 12um, it is 1
         norm = Llam[wave == 12000][0] # get normalisation at 12um
         assert norm > 0, (norm, Llam)
@@ -819,7 +819,16 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
         Llam[~mask] = Llam[mask][0]
         assert (Llam >= 0).all(), Llam
         base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(torustype, wave, Llam))
-        del Llam, mask, norm, wave
+        
+        # add same, but subtract a hot dust approximation
+        nuLnu = nuLnu/factor - np.exp(-(np.log10(data[:,0] / 2.6) / 0.5)**2)
+        Llam = nuLnu / freq * c / wave**2
+        # model is valid above 1um
+        # here we only pick above 2um, and then extrapolate 
+        mask = np.logical_and(wave > 2000, Llam > 0)
+        Llam[~mask] = 0.0
+        base.add_ActivateMorNetzer2012Torus(MorNetzer2012Torus(torustype + '-cold', wave, Llam))
+        
 
 
     # Mullaney templates show a slight difference between high and low luminosity
