@@ -71,42 +71,17 @@ class ActivateGTorus(CreationModule):
             "Wavelength of Si absorption feature in nm.",
             14224
         )),
-        ('SiEmwidth', (
+        ('SiEmWidth', (
             'float',
             "Width of Si absorption feature in nm.",
             1025.3
         )),
-        ('SiAbswidth', (
+        ('SiAbsWidth', (
             'float',
             "Width of Si absorption feature in nm.",
             1163.5
         )),
     ])
-
-    def _init_code(self):
-        """Get the template set out of the database"""
-        self.log_wave = np.linspace(-0.5, 2.5, 1000)
-        self.norm_index = np.argmin(np.abs(10**self.log_wave - 12))
-        self.wave = 10**self.log_wave * 1000 # in nm
-        self.Siwave = self.wave[np.logical_and(self.wave > 8015, self.wave < 19000)]
-        
-        self.fcov = self.parameters["fcov"]
-        self.logCOOLlam = np.log10(self.parameters["COOLlam"])
-        self.COOLlam = self.parameters["COOLlam"]
-        self.COOLwidth = self.parameters["COOLwidth"]
-        self.HOTfcov = self.parameters["HOTfcov"]
-        self.logHOTlam = np.log10(self.parameters["HOTlam"])
-        self.HOTlam = self.parameters["HOTlam"]
-        self.HOTwidth = self.parameters["HOTwidth"]
-
-        self.Si = self.parameters["Si"]
-        self.SiEmAmpl = 0.4
-        self.SiEmlam = self.parameters["SiEmlam"]
-        self.SiEmWidth = self.parameters["SiEmWidth"]
-        self.SiAbsAmpl = self.SiEmAmpl * self.parameters["SiRatio"]
-        self.SiAbslam = self.parameters["SiAbslam"]
-        self.SiAbsWidth = self.parameters["SiAbsWidth"]
-        
 
     def process(self, sed):
         """Add the AGN contributions
@@ -116,39 +91,58 @@ class ActivateGTorus(CreationModule):
         sed: pcigale.sed.SED object
         """
 
+        fcov = self.parameters["fcov"]
+        logCOOLlam = np.log10(self.parameters["COOLlam"])
+        COOLlam = self.parameters["COOLlam"]
+        COOLwidth = self.parameters["COOLwidth"]
+        HOTfcov = self.parameters["HOTfcov"]
+        logHOTlam = np.log10(self.parameters["HOTlam"])
+        HOTlam = self.parameters["HOTlam"]
+        HOTwidth = self.parameters["HOTwidth"]
+
+        Si = self.parameters["Si"]
+        SiEmAmpl = 0.4
+        SiEmlam = self.parameters["SiEmlam"]
+        SiEmWidth = self.parameters["SiEmWidth"]
+        SiAbsAmpl = SiEmAmpl * self.parameters["SiRatio"]
+        SiAbslam = self.parameters["SiAbslam"]
+        SiAbsWidth = self.parameters["SiAbsWidth"]
 
         l_agn = sed.info['agn.lum5100A']
 
         sed.add_module(self.name, self.parameters)
-        sed.add_info('agn.fcov', self.fcov)
-        sed.add_info('agn.Si', self.Si)
-        sed.add_info('agn.COOLlam', self.COOLlam)
-        sed.add_info('agn.COOLwidth', self.COOLwidth)
-        sed.add_info('agn.HOTfcov', self.HOTfcov)
-        sed.add_info('agn.HOTwidth', self.HOTwidth)
-        sed.add_info('agn.HOTlam', self.HOTlam)
+        sed.add_info('agn.fcov', fcov)
+        sed.add_info('agn.Si', Si)
+        sed.add_info('agn.COOLlam', COOLlam)
+        sed.add_info('agn.COOLwidth', COOLwidth)
+        sed.add_info('agn.HOTfcov', HOTfcov)
+        sed.add_info('agn.HOTwidth', HOTwidth)
+        sed.add_info('agn.HOTlam', HOTlam)
 
         # Add torus for NIR-MIR continuum
         # formula of Netzer (readme)
         # l_torus * 12um = 2.5 * l_agn * 510nm * fcov
         # l_agn is defined at 510nm, l_torus at 12um
         # because both are nu*L_nu = lam*L_lam normalisations, we need a
-        l_torus = 2.5 * l_agn * self.fcov / 12.0 * 0.510
+        l_torus = 2.5 * l_agn * fcov / 12.0 * 0.510
         sed.add_info('agn.lum12um', l_torus, True)
 
-        cool_spectrum = exp(-((self.log_wave - self.logCOOLlam) / self.COOLwidth)**2)
+        wave = sed.wavelength_grid
+        log_wave = np.log10(sed.wavelength_grid / 1000)
+        cool_spectrum = exp(-((log_wave - logCOOLlam) / COOLwidth)**2)
         
-        hot_spectrum = self.HOTfcov * 10**(self.logCOOLlam - self.logHOTlam) * exp(-((self.log_wave - self.logHOTlam) / self.HOTwidth)**2)
+        hot_spectrum = HOTfcov * 10**(logCOOLlam - logHOTlam) * exp(-((log_wave - logHOTlam) / HOTwidth)**2)
         total_spectrum = cool_spectrum + hot_spectrum
+        norm12 = np.interp(12000, sed.wavelength_grid, total_spectrum)
         # apply normalisation at 12 um:
-        torus_spectrum = l_torus * total_spectrum / total_spectrum[self.norm_index]
-        si_spectrum = l_torus * self.Si * (
-            self.SiEmAmpl * exp(-0.5 * ((self.Siwave - self.SiEmAmpl) / self.SiEmWidth)**2) - 
-            self.SiAbsAmpl * exp(-0.5 * ((self.Siwave - self.SiAbsAmpl) / self.SiAbsWidth)**2))
+        torus_spectrum = l_torus * total_spectrum / norm12
+        sed.add_contribution('agn.activate_Torus', wave, torus_spectrum)
 
-        sed.add_contribution('agn.activate_Torus', self.wave, torus_spectrum)
-        sed.add_contribution('agn.activate_Torus_Si', self.Siwave, si_spectrum)
-        l_torus_6um = np.interp(6000., self.wave, torus_spectrum)
+        si_spectrum = l_torus * Si * (
+            SiEmAmpl * exp(-0.5 * ((sed.wavelength_grid - SiEmlam) / SiEmWidth)**2) - 
+            SiAbsAmpl * exp(-0.5 * ((sed.wavelength_grid - SiAbslam) / SiAbsWidth)**2))
+        sed.add_contribution('agn.activate_Torus_Si', wave, si_spectrum)
+        l_torus_6um = np.interp(6000., sed.wavelength_grid, torus_spectrum)
         sed.add_info('agn.lum6um', l_torus_6um * 6 / 0.510, True)
 
 
