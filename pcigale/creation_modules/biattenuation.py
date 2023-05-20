@@ -82,13 +82,6 @@ class BiAttenuationLaw(CreationModule):
         else:
             self.filter_list = []
 
-        self.law_index_OPT = float(self.parameters["OPT_index"])
-        self.law_index_NIR = float(self.parameters["NIR_index"])
-        self.law_lam_break = float(self.parameters["lam_break"])
-        self.law_norm = float(self.parameters["norm"])
-        self.e_bv = float(self.parameters["E(B-V)"])
-        self.e_bv_agn = float(self.parameters["E(B-V)-AGN"])
-
     def process(self, sed):
         """Add the dust attenuation to the SED.
 
@@ -99,27 +92,35 @@ class BiAttenuationLaw(CreationModule):
         """
         wavelength = sed.wavelength_grid
 
+        law_index_OPT = float(self.parameters["OPT_index"])
+        law_index_NIR = float(self.parameters["NIR_index"])
+        law_lam_break = float(self.parameters["lam_break"])
+        law_norm = float(self.parameters["norm"])
+        e_bv = float(self.parameters["E(B-V)"])
+        e_bv_agn = float(self.parameters["E(B-V)-AGN"])
+
+        sed.add_module(self.name, self.parameters)
+        sed.add_info('attenuation.ebv', e_bv)
+        sed.add_info('attenuation.ebv_agn', e_bv_agn)
+
         if self.store_filter_attenuation:
             # Fλ fluxes (only from continuum) in each filter before attenuation.
             flux_noatt = {filt: sed.compute_fnu(filt) for filt in self.filter_list}
 
-        attenuation_curve = self.law_norm * (wavelength / self.law_lam_break)**(
-            np.where(wavelength < self.law_lam_break, self.law_index_OPT, self.law_index_NIR))
+        attenuation_curve = (law_norm * (wavelength / law_lam_break)**(
+            np.where(wavelength < law_lam_break, law_index_OPT, law_index_NIR))
+        ).reshape((1, -1))
 
         attenuation_total = 0.
-        attenuation_total_total = 0.
         attenuation_total_gal = 0.
-        sed.add_module(self.name, self.parameters)
-        for contrib in list(sed.contribution_names):
-            luminosity = sed.get_lumin_contribution(contrib)
-            e_bv_this = self.e_bv
-            if 'activate' in contrib:
-                e_bv_this += self.e_bv_agn
-            attenuated_luminosity = (luminosity * 10 **
-                                     (e_bv_this * attenuation_curve / -2.5))
-            attenuation_spectrum = attenuated_luminosity - luminosity
-            attenuation_total_total += attenuation_spectrum
-            if self.store_component_attenuation:
+        mask_agn_contrib = np.asarray(['activate' in contrib for contrib in sed.contribution_names])
+        attenuated_luminosities = sed.luminosities.copy()
+        attenuated_luminosities[~mask_agn_contrib,:] *= 10**(e_bv * attenuation_curve / -2.5)
+        attenuated_luminosities[mask_agn_contrib,:]  *= 10**((e_bv + e_bv_agn) * attenuation_curve / -2.5)
+        attenuation_spectra = attenuated_luminosities - sed.luminosities
+        attenuation_total_total = attenuation_spectra.sum(axis=0)
+        if self.store_component_attenuation:
+            for contrib, attenuation_spectrum in zip(sed.contribution_names, attenuation_spectra):
                 # We integrate the amount of luminosity attenuated (-1 because the
                 # spectrum is negative).
                 attenuation = -1 * np.trapz(attenuation_spectrum, wavelength)
@@ -131,7 +132,7 @@ class BiAttenuationLaw(CreationModule):
                 # sed.add_info("attenuation." + contrib, attenuation, True)
                 sed.add_contribution("attenuation." + contrib, wavelength,
                                      attenuation_spectrum)
-        if not self.store_component_attenuation:
+        else:
             sed.add_contribution("attenuation.total", wavelength,
                                  attenuation_total_total)
 
@@ -154,8 +155,6 @@ class BiAttenuationLaw(CreationModule):
                     sed.add_info("attenuation." + filt,
                                  -2.5 * np.log10(flux_att[filt] / flux_noatt[filt]))
 
-        sed.add_info('attenuation.ebv', self.e_bv)
-        sed.add_info('attenuation.ebv_agn', self.e_bv_agn)
 
 # CreationModule to be returned by get_module
 Module = BiAttenuationLaw
