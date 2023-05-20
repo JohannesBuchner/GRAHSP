@@ -8,7 +8,7 @@
 Prevot attenuation module
 ====================================================
 
-This module implements attenuation based on the Prevot attenuation law.
+This module implements attenuation based on the Prevot-like SMC law.
 
 Also allows burying the AGN component with extra attenuation.
 
@@ -17,7 +17,7 @@ Also allows burying the AGN component with extra attenuation.
 from collections import OrderedDict
 import numpy as np
 from . import CreationModule
-from pcigale.data import Database
+
 
 class BiAttenuationLaw(CreationModule):
     """Attenuation law module
@@ -32,10 +32,25 @@ class BiAttenuationLaw(CreationModule):
     """
 
     parameter_list = OrderedDict([
-        ("Law", (
+        ("OPT_index", (
             "string",
-            "Attenuation law to use",
-            "Prevot"
+            "Powerlaw index for attenuation law in the optical. Use -1.2 for Prevot",
+            "-1.2"
+        )),
+        ("NIR_index", (
+            "string",
+            "Powerlaw index for attenuation law in the NIR. Use -2.6 for Prevot",
+            "-3"
+        )),
+        ("norm", (
+            "string",
+            "Attenuation law normalisation at lam_break. Use 1.2 for Prevot",
+            "1.2"
+        )),
+        ("lam_break", (
+            "string",
+            "Attenuation law powerlaw break in nm. Use 1100 for Prevot",
+            "1100"
         )),
         ("E(B-V)", (
             "float",
@@ -61,16 +76,16 @@ class BiAttenuationLaw(CreationModule):
     def _init_code(self):
         # We cannot compute the attenuation until we know the wavelengths. Yet,
         # we reserve the object.
-        law = self.parameters["Law"]
         if self.parameters["filters"].strip() != '':
             self.filter_list = [item.strip() for item in
                                 self.parameters["filters"].split("&")]
         else:
             self.filter_list = []
 
-        with Database() as base:
-            self.law = base.get_AttenuationLaw(law)
-        self.sel_attenuation = None
+        self.law_index_OPT = float(self.parameters["OPT_index"])
+        self.law_index_NIR = float(self.parameters["NIR_index"])
+        self.law_lam_break = float(self.parameters["lam_break"])
+        self.law_norm = float(self.parameters["norm"])
         self.e_bv = float(self.parameters["E(B-V)"])
         self.e_bv_agn = float(self.parameters["E(B-V)-AGN"])
 
@@ -88,10 +103,8 @@ class BiAttenuationLaw(CreationModule):
             # Fλ fluxes (only from continuum) in each filter before attenuation.
             flux_noatt = {filt: sed.compute_fnu(filt) for filt in self.filter_list}
 
-        # Compute attenuation curve
-        if self.sel_attenuation is None or self.sel_attenuation.shape != wavelength.shape:
-            self.sel_attenuation = np.interp(wavelength, self.law.wave, self.law.k, left=0, right=0)
-            self.sel_attenuation[wavelength < 60] = 100
+        attenuation_curve = self.law_norm * (wavelength / self.law_lam_break)**(
+            np.where(wavelength < self.law_lam_break, self.law_index_OPT, self.law_index_NIR))
 
         attenuation_total = 0.
         attenuation_total_total = 0.
@@ -101,9 +114,9 @@ class BiAttenuationLaw(CreationModule):
             luminosity = sed.get_lumin_contribution(contrib)
             e_bv_this = self.e_bv
             if 'activate' in contrib:
-                e_bv_this += self.e_bv_agn 
+                e_bv_this += self.e_bv_agn
             attenuated_luminosity = (luminosity * 10 **
-                                     (e_bv_this * self.sel_attenuation / -2.5))
+                                     (e_bv_this * attenuation_curve / -2.5))
             attenuation_spectrum = attenuated_luminosity - luminosity
             attenuation_total_total += attenuation_spectrum
             if self.store_component_attenuation:
@@ -114,8 +127,8 @@ class BiAttenuationLaw(CreationModule):
                 if 'activate' not in contrib:
                     attenuation_total_gal += attenuation
 
-                #sed.add_info("attenuation.E_BVs." + contrib, e_bv)
-                #sed.add_info("attenuation." + contrib, attenuation, True)
+                # sed.add_info("attenuation.E_BVs." + contrib, e_bv)
+                # sed.add_info("attenuation." + contrib, attenuation, True)
                 sed.add_contribution("attenuation." + contrib, wavelength,
                                      attenuation_spectrum)
         if not self.store_component_attenuation:
