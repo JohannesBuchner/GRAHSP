@@ -41,6 +41,11 @@ class Dale2014(CreationModule):
             "3.2500, 3.3125, 3.3750, 3.4375, 3.5000, 3.5625, 3.6250, 3.6875, "
             "3.7500, 3.8125, 3.8750, 3.9375, 4.0000",
             2.
+        )),
+        ('lam_max', (
+            'float',
+            "Maximum wavelength to compute model for, in nm. If -1, use full model.",
+            -1,
         ))
     ])
 
@@ -52,9 +57,15 @@ class Dale2014(CreationModule):
         The energy attenuated is re-injected in model_sb only.
         """
         alpha = self.parameters["alpha"]
+        self.lambda_max = float(self.parameters["lam_max"])
 
         with Database() as database:
             self.model_sb = database.get_dale2014(0.00, alpha)
+            # clip model if needed
+            if self.lambda_max > 0:
+                mask = self.model_sb.wave <= self.lambda_max
+                self.model_sb.lumin = self.model_sb.lumin[mask]
+                self.model_sb.wave = self.model_sb.wave[mask]
 
     def process(self, sed):
         """Add the IR re-emission contributions
