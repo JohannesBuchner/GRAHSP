@@ -73,7 +73,6 @@ class SedWarehouse(object):
             if name in self.reusable:
                 module.parameters.update(kwargs)
         else:
-            print("creating...", name, kwargs)
             module = creation_modules.get_module(name, **kwargs)
             self.module_cache[module_key] = module
 
