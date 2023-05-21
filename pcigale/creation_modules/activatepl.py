@@ -16,10 +16,52 @@ import numpy as np
 from numpy import exp, log
 from . import CreationModule
 
+from numba import jit
+
+@jit(nopython=True)
+def sbpl_jitted(result, x, xmax, norm, lam1, lam2, x0, xbrk, Lambda):
+    """Smoothly bending powerlaw
+
+    Parameterization from Ryde98
+
+    Parameters
+    ----------
+    result: array for storing the result, assumed dense
+    x: array of independent variable
+    xmax: only consider x values up to this value
+    norm: normalisation at x0
+    lam1: powerlaw slope below xbrk
+    lam2: powerlaw slope above xbrk
+    xbrk: x value where powerlaw break occurs
+    Lambda: width of bend at xbrk
+    """
+    expo = 1. / Lambda
+    lamaddexpo = (lam1 + lam2 + 2) / 2.
+    lamsubexpo = (lam2 - lam1) / 2. * Lambda
+    xpivratio = x0 / xbrk
+    divisor = 1.0 / (xpivratio**expo + xpivratio**-expo)
+    for i in range(len(x)):
+        if x[i] > xmax:
+            break
+        xratio = x[i] / xbrk
+        result[i] = norm * (x[i] / x0)**lamaddexpo * \
+            ((xratio**expo + xratio**-expo) * divisor)**lamsubexpo  * (x0 / x[i])
+
+
 def sbpl(x, norm, lam1, lam2, x0, xbrk, Lambda):
     """Smoothly bending powerlaw
 
     Parameterization from Ryde98
+
+    Parameters
+    ----------
+    x: array of independent variable
+    xmax: only consider x values up to this value
+    norm: normalisation at x0
+    lam1: powerlaw slope below xbrk
+    lam2: powerlaw slope above xbrk
+    xbrk: x value where powerlaw break occurs
+    Lambda: width of bend at xbrk
     """
     with np.errstate(over='ignore'):
         q = log(x/xbrk) / Lambda
@@ -81,9 +123,17 @@ class ActivatePL(CreationModule):
         l_agn = sed.info["agn.lum5100A"]
         
         assert (self.parameters["uvslope"] > self.parameters["plslope"]), (self.parameters["uvslope"], self.parameters["plslope"])
-        bbb = sbpl(sed.wavelength_grid, l_agn, 
+        # for computational efficiency, do not compute above 10um
+        bbb = np.zeros_like(sed.wavelength_grid)
+        # bbb2 = np.zeros_like(sed.wavelength_grid)
+        # mask = sed.wavelength_grid <= 10000
+        # bbb[mask] = sbpl(sed.wavelength_grid[mask], l_agn, 
+        #      self.parameters["uvslope"], self.parameters["plslope"],
+        #      510.0, self.parameters["plbendloc"], self.parameters["plbendwidth"])
+        sbpl_jitted(bbb, sed.wavelength_grid, 10000, l_agn, 
             self.parameters["uvslope"], self.parameters["plslope"],
             510.0, self.parameters["plbendloc"], self.parameters["plbendwidth"])
+        # np.testing.assert_allclose(bbb2, bbb)
         assert np.isfinite(bbb).all()
 
         sed.add_contribution('agn.activate_Disk', sed.wavelength_grid, bbb)
