@@ -240,7 +240,7 @@ def best_grid(wavelengths1, wavelengths2):
 
     Considering the two wavelength grids passed in parameters, this function
     compute the best new grid that will be used to regrid the two spectra
-    before combining them. We do not use np.unique as it is much slowe than
+    before combining them. We do not use np.unique as it is much slower than
     finding the unique elements by hand.
 
     Parameters
@@ -369,6 +369,15 @@ def interpolate_lumin(wl, lumin, wl_new, lumin_new):
 
     return (wl_best, lumin_out)
 
+
+from numba import jit
+
+@jit(nopython=True)
+def flux_trapz_jitted(x, y, factor):
+    result = 0.0
+    for i in range(len(y) - 1):
+        result += (x[i + 1] - x[i]) * (y[i] * factor[i] + y[i + 1] * factor[i + 1])
+    return result / 2.0
 
 def flux_trapz(y, x, key):
     """

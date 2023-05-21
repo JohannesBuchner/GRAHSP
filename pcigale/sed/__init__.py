@@ -289,7 +289,7 @@ class SED(object):
             dist = 10. * parsec
 
         if key in self.cache_filters:
-            wavelength_r, transmission_r, lambda_eff = self.cache_filters[key]
+            wavelength_r, transmission_r, lambda_eff, interp_indices, interp_weight = self.cache_filters[key]
         else:
             with Database() as db:
                 filter_ = db.get_filter(filter_name)
@@ -315,13 +315,25 @@ class SED(object):
             transmission_r = np.interp(wavelength_r, trans_table[0],
                                        trans_table[1])
 
-            self.cache_filters[key] = (wavelength_r, transmission_r,
-                                       lambda_eff)
+            # if the following code fails, then the filter is hitting the 
+            # boundary of the model wavelengths
+            interp_indices = np.searchsorted(wavelength, wavelength_r) - 1
+            assert np.all(wavelength[interp_indices] <= wavelength_r), (wavelength_r, wavelength[interp_indices], wavelength[interp_indices + 1])
+            assert np.all(wavelength[interp_indices + 1] >= wavelength_r), (wavelength_r, wavelength[interp_indices], wavelength[interp_indices + 1])
+            interp_weight = (wavelength_r - wavelength[interp_indices]) / (wavelength[interp_indices + 1] - wavelength[interp_indices])
+            assert np.all(interp_weight >= 0), (interp_weight.min(), interp_weight.max())
+            assert np.all(interp_weight <= 1), (interp_weight.min(), interp_weight.max())
 
-        l_lambda_r = np.interp(wavelength_r, wavelength, self.luminosity)
+            self.cache_filters[key] = (wavelength_r, transmission_r,
+                                       lambda_eff, interp_indices, interp_weight)
+
+        # l_lambda_r = np.interp(wavelength_r, wavelength, self.luminosity)
+        # l_lambda_r = np.interp(wavelength_r, wavelength[ilo:ihi], self.luminosity[ilo:ihi])
+        l_lambda_r = self.luminosity[interp_indices] * (1 - interp_weight) + interp_weight * self.luminosity[interp_indices + 1]
 
         f_lambda = utils.luminosity_to_flux(
-            utils.flux_trapz(transmission_r * l_lambda_r, wavelength_r, key),
+            # utils.flux_trapz(transmission_r * l_lambda_r, wavelength_r, key),
+            utils.flux_trapz_jitted(wavelength_r, l_lambda_r, transmission_r),
             dist)
 
         # Return Fν in mJy. The 1e-9 factor is because λ is in nm and 1e29 for
