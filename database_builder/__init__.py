@@ -992,7 +992,7 @@ def build_nebular(base):
     for idxZ, metallicity in enumerate(metallicities):
         for idxU, logU in enumerate(logUs):
             for ne, spectrum in zip(nes, lines[idxZ, idxU, :, :]):
-                line = NebularLines(np.float(metallicity), float(logU), float(ne), wave_lines, spectrum)
+                line = NebularLines(float(metallicity), float(logU), float(ne), wave_lines, spectrum)
                 base.add_nebular_lines(line)
 
     # Import continuum
@@ -1003,7 +1003,7 @@ def build_nebular(base):
     for idxZ, metallicity in enumerate(metallicities):
         for idxU, logU in enumerate(logUs):
             for ne, spectrum in zip(nes, spectra[idxZ, idxU, :, :]):
-                cont = NebularContinuum(np.float(metallicity), float(logU), float(ne), wave_cont_interp, spectrum)
+                cont = NebularContinuum(float(metallicity), float(logU), float(ne), wave_cont_interp, spectrum)
                 base.add_nebular_continuum(cont)
 
 
