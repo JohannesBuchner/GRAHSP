@@ -33,34 +33,34 @@ class BiAttenuationLaw(CreationModule):
 
     parameter_list = OrderedDict([
         ("OPT_index", (
-            "string",
+            "float",
             "Powerlaw index for attenuation law in the optical. Use -1.2 for Prevot",
-            "-1.2"
+            -1.2
         )),
         ("NIR_index", (
-            "string",
+            "float",
             "Powerlaw index for attenuation law in the NIR. Use -2.6 for Prevot",
-            "-3"
+            -3.0
         )),
         ("norm", (
-            "string",
+            "float",
             "Attenuation law normalisation at lam_break. Use 1.2 for Prevot",
-            "1.2"
+            1.2
         )),
         ("lam_break", (
-            "string",
+            "float",
             "Attenuation law powerlaw break in nm. Use 1100 for Prevot",
-            "1100"
+            1100
         )),
         ("E(B-V)", (
             "float",
             "B-V attenuation applied",
-            1.
+            1.0
         )),
         ("E(B-V)-AGN", (
             "float",
             "Additional B-V attenuation applied to activate AGN components",
-            0.
+            0.0
         )),
         ("filters", (
             "string",
@@ -92,12 +92,12 @@ class BiAttenuationLaw(CreationModule):
         """
         wavelength = sed.wavelength_grid
 
-        law_index_OPT = float(self.parameters["OPT_index"])
-        law_index_NIR = float(self.parameters["NIR_index"])
-        law_lam_break = float(self.parameters["lam_break"])
-        law_norm = float(self.parameters["norm"])
-        e_bv = float(self.parameters["E(B-V)"])
-        e_bv_agn = float(self.parameters["E(B-V)-AGN"])
+        law_index_OPT = self.parameters["OPT_index"]
+        law_index_NIR = self.parameters["NIR_index"]
+        law_lam_break = self.parameters["lam_break"]
+        law_norm = self.parameters["norm"]
+        e_bv = self.parameters["E(B-V)"]
+        e_bv_agn = self.parameters["E(B-V)-AGN"]
 
         sed.add_module(self.name, self.parameters)
         sed.add_info('attenuation.ebv', e_bv)
@@ -107,43 +107,53 @@ class BiAttenuationLaw(CreationModule):
             # Fλ fluxes (only from continuum) in each filter before attenuation.
             flux_noatt = {filt: sed.compute_fnu(filt) for filt in self.filter_list}
 
-        attenuation_curve = (law_norm * (wavelength / law_lam_break)**(
-            np.where(wavelength < law_lam_break, law_index_OPT, law_index_NIR))
+        mask_agn_contrib = np.empty(len(sed.contribution_names), dtype=bool)
+        for i, contrib in enumerate(sed.contribution_names):
+            mask_agn_contrib[i] = 'activate' in contrib
+            del i, contrib
+
+        # handle only part where attenuation matters
+        wavelength_negligible_attenuation = wavelength > 40000
+        if np.any(wavelength_negligible_attenuation) and False:
+            imax = np.where(wavelength_negligible_attenuation)[0][0]
+        else:
+            imax = None
+        attenuation_curve = (law_norm * (wavelength[:imax] / law_lam_break)**(
+            np.where(wavelength[:imax] < law_lam_break, law_index_OPT, law_index_NIR))
         ).reshape((1, -1))
 
-        attenuation_total = 0.
-        attenuation_total_gal = 0.
-        mask_agn_contrib = np.asarray(['activate' in contrib for contrib in sed.contribution_names])
-        attenuated_luminosities = sed.luminosities.copy()
-        attenuated_luminosities[~mask_agn_contrib,:] *= 10**(e_bv * attenuation_curve / -2.5)
-        attenuated_luminosities[mask_agn_contrib,:]  *= 10**((e_bv + e_bv_agn) * attenuation_curve / -2.5)
-        attenuation_spectra = attenuated_luminosities - sed.luminosities
-        attenuation_total_total = attenuation_spectra.sum(axis=0)
         if self.store_component_attenuation:
+            attenuated_luminosities = sed.luminosities.copy()
+            attenuated_luminosities[~mask_agn_contrib,:imax] *= 10**(e_bv * attenuation_curve / -2.5)
+            attenuated_luminosities[mask_agn_contrib, :imax] *= 10**((e_bv + e_bv_agn) * attenuation_curve / -2.5)
+            attenuation_spectra = attenuated_luminosities - sed.luminosities
+            # We integrate the amount of luminosity attenuated (-1 because the
+            # spectrum is negative).
+            attenuation_total_gal = -1 * np.trapz(attenuation_spectra[~mask_agn_contrib,:imax].sum(axis=0), wavelength[:imax])
             for contrib, attenuation_spectrum in zip(sed.contribution_names, attenuation_spectra):
-                # We integrate the amount of luminosity attenuated (-1 because the
-                # spectrum is negative).
-                attenuation = -1 * np.trapz(attenuation_spectrum, wavelength)
-                attenuation_total += attenuation
-                if 'activate' not in contrib:
-                    attenuation_total_gal += attenuation
-
-                # sed.add_info("attenuation.E_BVs." + contrib, e_bv)
-                # sed.add_info("attenuation." + contrib, attenuation, True)
                 sed.add_contribution("attenuation." + contrib, wavelength,
                                      attenuation_spectrum)
         else:
+            # compute accurately, to avoid negative fluxes
+            sed.luminosity = sed.luminosities.sum(axis=0)
+            gal_emission = sed.luminosities[~mask_agn_contrib,:imax].sum(axis=0)
+            nonagn_luminosities = gal_emission * 10**(e_bv * attenuation_curve[0,:imax] / -2.5)
+            agn_luminosities = sed.luminosities[mask_agn_contrib,:imax].sum(axis=0) * 10**((e_bv + e_bv_agn) * attenuation_curve[0,:imax] / -2.5)
+            attenuation_total_gal = -np.trapz(nonagn_luminosities - gal_emission, wavelength[:imax])
+            attenuation_total_total2 = -sed.luminosity
+            attenuation_total_total2[:imax] += nonagn_luminosities + agn_luminosities
+            mask_negative = attenuation_total_total2 < -sed.luminosity
+            attenuation_total_total2[mask_negative] = -sed.luminosity[mask_negative]
             sed.add_contribution("attenuation.total", wavelength,
-                                 attenuation_total_total)
+                                 attenuation_total_total2)
 
-        if self.store_component_attenuation:
-            # Total attenuation
-            if 'dust.luminosity' in sed.info:
-                sed.add_info("dust.luminosity",
-                             sed.info["dust.luminosity"] + attenuation_total_gal, True,
-                             True)
-            else:
-                sed.add_info("dust.luminosity", attenuation_total_gal, True)
+        # Total attenuation
+        if 'dust.luminosity' in sed.info:
+            sed.add_info("dust.luminosity",
+                         sed.info["dust.luminosity"] + attenuation_total_gal, True,
+                         True)
+        else:
+            sed.add_info("dust.luminosity", attenuation_total_gal, True)
 
         if self.store_filter_attenuation:
             # Fλ fluxes (only from continuum) in each filter after attenuation.
