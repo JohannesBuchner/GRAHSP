@@ -99,6 +99,11 @@ class ActivatePL(CreationModule):
             "values near 0 are reasonable",
             0.0
         )),
+        ('cutoff', (
+            'float',
+            "Powerlaw cutoff in the IR in nm. Set to -1 to not apply a cutoff.",
+            10000.0
+        )),
     ])
 
 
@@ -117,21 +122,18 @@ class ActivatePL(CreationModule):
         sed.add_info('agn.plbendloc', self.parameters["plbendloc"])
         sed.add_info('agn.plbendwidth', self.parameters["plbendwidth"])
         sed.add_info('agn.uvslope', self.parameters["uvslope"])
+        sed.add_info('agn.cutoff', self.parameters["cutoff"])
 
         l_agn = sed.info["agn.lum5100A"]
         
         assert (self.parameters["uvslope"] > self.parameters["plslope"]), (self.parameters["uvslope"], self.parameters["plslope"])
         bbb = np.empty_like(sed.wavelength_grid)
-        # bbb2 = np.zeros_like(sed.wavelength_grid)
-        # mask = sed.wavelength_grid <= 10000
-        # bbb[mask] = sbpl(sed.wavelength_grid[mask], l_agn, 
-        #      self.parameters["uvslope"], self.parameters["plslope"],
-        #      510.0, self.parameters["plbendloc"], self.parameters["plbendwidth"])
         sbpl_jitted(bbb, sed.wavelength_grid, l_agn, 
             self.parameters["uvslope"], self.parameters["plslope"],
             510.0, self.parameters["plbendloc"], self.parameters["plbendwidth"])
-        # np.testing.assert_allclose(bbb2, bbb)
         assert np.isfinite(bbb).all()
+        if self.parameters["cutoff"] > 0:
+            bbb *= -np.expm1(-(self.parameters["cutoff"]/sed.wavelength_grid))
 
         sed.add_contribution('agn.activate_Disk', sed.wavelength_grid, bbb)
         sed.add_info('agn.lum2500A_disk', np.interp(250., sed.wavelength_grid, bbb), True)
