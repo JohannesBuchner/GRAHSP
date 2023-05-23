@@ -19,7 +19,7 @@ from . import CreationModule
 from numba import jit
 
 @jit(nopython=True)
-def sbpl_jitted(result, x, xmax, norm, lam1, lam2, x0, xbrk, Lambda):
+def sbpl_jitted(result, x, norm, lam1, lam2, x0, xbrk, Lambda):
     """Smoothly bending powerlaw
 
     Parameterization from Ryde98
@@ -41,8 +41,6 @@ def sbpl_jitted(result, x, xmax, norm, lam1, lam2, x0, xbrk, Lambda):
     xpivratio = x0 / xbrk
     divisor = 1.0 / (xpivratio**expo + xpivratio**-expo)
     for i in range(len(x)):
-        if x[i] > xmax:
-            break
         xratio = x[i] / xbrk
         result[i] = norm * (x[i] / x0)**lamaddexpo * \
             ((xratio**expo + xratio**-expo) * divisor)**lamsubexpo  * (x0 / x[i])
@@ -123,14 +121,13 @@ class ActivatePL(CreationModule):
         l_agn = sed.info["agn.lum5100A"]
         
         assert (self.parameters["uvslope"] > self.parameters["plslope"]), (self.parameters["uvslope"], self.parameters["plslope"])
-        # for computational efficiency, do not compute above 10um
-        bbb = np.zeros_like(sed.wavelength_grid)
+        bbb = np.empty_like(sed.wavelength_grid)
         # bbb2 = np.zeros_like(sed.wavelength_grid)
         # mask = sed.wavelength_grid <= 10000
         # bbb[mask] = sbpl(sed.wavelength_grid[mask], l_agn, 
         #      self.parameters["uvslope"], self.parameters["plslope"],
         #      510.0, self.parameters["plbendloc"], self.parameters["plbendwidth"])
-        sbpl_jitted(bbb, sed.wavelength_grid, 10000, l_agn, 
+        sbpl_jitted(bbb, sed.wavelength_grid, l_agn, 
             self.parameters["uvslope"], self.parameters["plslope"],
             510.0, self.parameters["plbendloc"], self.parameters["plbendwidth"])
         # np.testing.assert_allclose(bbb2, bbb)
