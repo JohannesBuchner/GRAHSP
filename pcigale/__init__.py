@@ -11,7 +11,7 @@ from .session.configuration import Configuration
 from .analysis_modules import get_module as get_analysis_module
 from .analysis_modules.utils import ParametersHandler
 
-__version__ = "0.1-alpha"
+__version__ = "1.0.0"
 
 
 def init(config):

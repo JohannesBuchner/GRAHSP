@@ -122,11 +122,11 @@ class ActivateGTorus(CreationModule):
         sed.add_module(self.name, self.parameters)
         sed.add_info('agn.fcov', fcov)
         sed.add_info('agn.Si', Si)
-        sed.add_info('agn.COOLlam', COOLlam)
+        sed.add_info('agn.COOLlam', COOLlam, unit='um')
         sed.add_info('agn.COOLwidth', COOLwidth)
         sed.add_info('agn.HOTfcov', HOTfcov)
         sed.add_info('agn.HOTwidth', HOTwidth)
-        sed.add_info('agn.HOTlam', HOTlam)
+        sed.add_info('agn.HOTlam', HOTlam, unit='um')
 
         # Add torus for NIR-MIR continuum
         # formula of Netzer (readme)
@@ -134,7 +134,7 @@ class ActivateGTorus(CreationModule):
         # l_agn is defined at 510nm, l_torus at 12um
         # because both are nu*L_nu = lam*L_lam normalisations, we need a
         l_torus = 2.5 * l_agn * fcov / 12.0 * 0.510
-        sed.add_info('agn.lum12um', l_torus, True)
+        sed.add_info('agn.lum12um', l_torus, True, unit='W/nm')
 
         cool_spectrum = exp(-((self.log_wave - logCOOLlam) / COOLwidth)**2)
         
@@ -152,7 +152,7 @@ class ActivateGTorus(CreationModule):
         si_spectrum[mask_negative] = -sed.luminosities[-1,mask_negative]
         sed.add_contribution('agn.activate_Torus_Si', sed.wavelength_grid, si_spectrum)
         l_torus_6um = np.interp(6000., self.wave, torus_spectrum)
-        sed.add_info('agn.lum6um', l_torus_6um * 6 / 0.510, True)
+        sed.add_info('agn.lum6um', l_torus_6um, True, unit='W/nm')
 
 
 # CreationModule to be returned by get_module
