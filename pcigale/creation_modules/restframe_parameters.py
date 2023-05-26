@@ -252,20 +252,22 @@ class RestframeParam(CreationModule):
             sed.add_info("param.IRX", np.log10(sed.info['dust.luminosity'] /
                          (fluxes['FUV'] * self.to_lumin * c / 154e-9)))
 
-        if 'nebular.lines_young' in sed.luminosities:
+        if self.lines and 'nebular.lines_young' in sed.contribution_names:
             for line, EW in self.EW(sed).items():
                 sed.add_info(f"param.EW({line[0]}/{line[1]})", EW, unit='nm')
 
-        for line, EW in self.EW_empirical(sed):
-            sed.add_info("param.EW_%s" % line, EW, unit='nm')
+        if self.empirical_lines:
+            for line, EW in self.EW_empirical(sed):
+                sed.add_info("param.EW_%s" % line, EW, unit='nm')
 
-        for filt in self.lumin_filters:
-            sed.add_info(f"param.restframe_Lnu({filt})",
-                         fluxes[filt] * self.to_lumin, True, unit='W/Hz')
-        for filt1, filt2 in self.colours:
-            sed.add_info(f"param.restframe_{filt1}-{filt2}",
-                         2.5 * np.log10(fluxes[filt2] / fluxes[filt1]),
-                         unit='mag')
+        with np.errstate(invalid='ignore', divide='ignore'):
+            for filt in self.lumin_filters:
+                sed.add_info(f"param.restframe_Lnu({filt})",
+                             fluxes[filt] * self.to_lumin, True, unit='W/Hz')
+            for filt1, filt2 in self.colours:
+                sed.add_info(f"param.restframe_{filt1}-{filt2}",
+                             2.5 * np.log10(fluxes[filt2] / fluxes[filt1]),
+                             unit='mag')
 
 
 # SedModule to be returned by get_module
