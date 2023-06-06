@@ -182,7 +182,11 @@ class RestframeParam(CreationModule):
             # guess continuum at the center
             y_mid = (y[0] + y[-1]) / 2
             area = np.trapz(y=y - y_mid, x=x)
-            EW = area / y_mid
+            if y_mid == 0:
+                EW = 0
+            else:
+                EW = area / y_mid
+            assert np.isfinite(EW), (area, y_mid, y[0], y[-1], EW)
             yield linename, EW
 
     def _init_code(self):
