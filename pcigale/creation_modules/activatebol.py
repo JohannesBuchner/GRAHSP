@@ -33,13 +33,13 @@ class ActivateBol(CreationModule):
         agn_noTOR_mask = np.array(['activate' in name and 'Torus' not in name for name in sed.contribution_names])
         BBB_luminosity = sed.luminosities[agn_noTOR_mask,:].sum(axis=0)
         LbolBBB = np.trapz(y=BBB_luminosity[wave_mask], x=wavelength[wave_mask])
-        sed.add_info('agn.LbolBBB', LbolBBB, True)
+        sed.add_info('agn.lumBolBBB', LbolBBB, True)
         
         # Compute bolometric torus luminosity
         agn_TOR_mask = np.array(['activate' in name and 'Torus' in name for name in sed.contribution_names])
         TOR_luminosity = sed.luminosities[agn_TOR_mask,:].sum(axis=0)
         LbolTOR = np.trapz(y=TOR_luminosity, x=wavelength)
-        sed.add_info('agn.LbolTOR', LbolTOR, True)
+        sed.add_info('agn.lumBolTOR', LbolTOR, True)
         
         # Compute normalised excess variance.
         # from Simm+16 Table 3 empirical relation.
