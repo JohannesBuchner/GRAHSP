@@ -34,7 +34,7 @@ class BiAttenuationLaw(CreationModule):
     parameter_list = OrderedDict([
         ("OPT_index", (
             "float",
-            "Powerlaw index for attenuation law in the optical. Use -1.2 for Prevot",
+            "Powerlaw index for attenuation law in the optical. Use -1.2 for Prevot, -1 for Fawcett+22.",
             -1.2
         )),
         ("NIR_index", (
