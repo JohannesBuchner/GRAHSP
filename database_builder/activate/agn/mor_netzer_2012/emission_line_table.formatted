@@ -11,7 +11,7 @@ Lya	1215	10	35	30
 NV	1240	3	3	0
 OI	1304	0.5	0	0
 CII	1336	0.3	0	0
-SiIV,OIV]	1400	1.5	1	0
+SiIV,OIV]	1400	1.3	1	0
 NIV]	1486	0.7	1	0
 CIV	1549	5	8	0
 HeII	1640	0.6	0.6	0
@@ -23,6 +23,11 @@ MgII	2798	3	1	0.5
 [NeV]	3426	0	1	0
 [OII]	3727	0	3	3
 [NeIII]	3869	0	0.5	0
+#[NeV]	3426	0.2	0.2	0
+#[OII]	3727	0.3	0.3	3
+#[NeIII]	3869	0	0.5	0.3
+# Hg EW ratio is median from Rakshit+20 https://ui.adsabs.harvard.edu/abs/2020ApJS..249...17R/abstract
+Hg	4340	0.25	0.25	0.25
 HeII	4686	0.1	0.1	0
 Hb	4861	1	1	1
 [OIII]	4959	0	3	0.8
