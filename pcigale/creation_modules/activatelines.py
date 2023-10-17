@@ -17,6 +17,8 @@ from . import CreationModule
 import scipy.constants as cst
 
 fwhm_to_sigma_conversion = 1 / (2 * np.sqrt(2 * np.log(2)))
+
+
         
 class ActivateLines(CreationModule):
     """Activate AGN Emission lines (BL, Sy2 or LINER), and FeII forest
@@ -64,6 +66,9 @@ class ActivateLines(CreationModule):
         # we do not attempt to resolve the lines
         # so choose something very small here
         self.lines_width = self.parameters["linewidth"]  # km / s
+        self.narrow_lines_width = self.lines_width
+        # sensible change for future versions:
+        # self.narrow_lines_width = 500
         new_wave = np.array([])
         for line_wave in self.emLines.wave:
             # get line width in nm
@@ -100,31 +105,32 @@ class ActivateLines(CreationModule):
 
         if self.agnType == 1: # BLAGN
             self.add_lines(sed, 'agn.activate_EmLines_BL', self.emLines.wave,
-                                 l_broadlines * self.emLines.lumin_BLAGN)
+                                 l_broadlines * self.emLines.lumin_BLAGN, self.lines_width)
             self.add_lines(sed, 'agn.activate_EmLines_NL', self.emLines.wave,
-                                 l_narrowlines * self.emLines.lumin_Sy2)
+                                 l_narrowlines * self.emLines.lumin_Sy2, self.narrow_lines_width)
             # use FeII as well
             l_fe2 = self.AFeII * l_broadlines
             sed.add_contribution('agn.activate_FeLines', self.fe2.wave,
                                  l_fe2 * self.fe2.lumin)
         elif self.agnType == 2: # Sy2
             self.add_lines(sed, 'agn.activate_EmLines_NL', self.emLines.wave,
-                                 l_narrowlines * self.emLines.lumin_Sy2)
+                                 l_narrowlines * self.emLines.lumin_Sy2, self.narrow_lines_width)
             sed.add_contribution('agn.activate_FeLines', self.fe2.wave, 0 * self.fe2.lumin)
         elif self.agnType == 3: # LINER
             self.add_lines(sed, 'agn.activate_EmLines_LINER', self.emLines.wave,
-                                 l_narrowlines * self.emLines.lumin_LINER)
+                                 l_narrowlines * self.emLines.lumin_LINER, self.narrow_lines_width)
             sed.add_contribution('agn.activate_FeLines', self.fe2.wave, 0 * self.fe2.lumin)
     
-    def add_lines(self, sed, name, wave, lumin):
+    def add_lines(self, sed, name, wave, lumin, lines_width):
         """add Gaussian lines to SED.
 
         Parameters
         ----------
         sed: pcigale.sed.SED object
-        name (str): name of the contribution
+        name: name of the contribution
         wave: array of wavelengths of the lines
         lumin: array of equivalent widths of the lines
+        lines_width: line width in km/s
         """
         # all widths are FWHM, so
         # sigma = width / (2 * sqrt(2 * log(2)))
@@ -133,7 +139,7 @@ class ActivateLines(CreationModule):
         new_wave = self.new_wave
         new_lumin = np.zeros_like(new_wave)
         for line_flux, line_wave in zip(lumin, wave):
-            width = line_wave * (self.lines_width * 1000) / cst.c
+            width = line_wave * (lines_width * 1000) / cst.c
             sigma = width * fwhm_to_sigma_conversion
             norm = 510 / np.sqrt(np.pi * sigma**2)
             shape = np.exp(-0.5 * (new_wave - line_wave) ** 2. / sigma**2)
