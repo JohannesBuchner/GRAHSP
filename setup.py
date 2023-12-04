@@ -6,6 +6,7 @@
 from distutils.command.build import build
 
 from setuptools import find_packages, setup
+import os
 
 if 'SPEED' not in os.environ:
     raise Exception("""
@@ -40,7 +41,7 @@ setup(
 
     install_requires=['numpy', 'scipy', 'sqlalchemy', 'matplotlib',
                       'configobj', 'astropy'],
-
+    setup_requires=['numpy', 'scipy', 'sqlalchemy', 'astropy', 'configobj'],
     entry_points=entry_points,
 
     cmdclass={"build": custom_build},
