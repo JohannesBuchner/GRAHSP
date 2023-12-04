@@ -12,7 +12,7 @@ This module computes bolometric luminosities.
 """
 import numpy as np
 from . import CreationModule
-        
+
 class ActivateBol(CreationModule):
     """Activate AGN bolometric luminosities"""
 
@@ -34,20 +34,34 @@ class ActivateBol(CreationModule):
         BBB_luminosity = sed.luminosities[agn_noTOR_mask,:].sum(axis=0)
         LbolBBB = np.trapz(y=BBB_luminosity[wave_mask], x=wavelength[wave_mask])
         sed.add_info('agn.lumBolBBB', LbolBBB, True)
-        
+
         # Compute bolometric torus luminosity
         agn_TOR_mask = np.array(['activate' in name and 'Torus' in name for name in sed.contribution_names])
         TOR_luminosity = sed.luminosities[agn_TOR_mask,:].sum(axis=0)
         LbolTOR = np.trapz(y=TOR_luminosity, x=wavelength)
         sed.add_info('agn.lumBolTOR', LbolTOR, True)
-        
-        # Compute normalised excess variance.
+        # Compute AGN fraction with this luminosity
+        gal_mask = np.array(['activate' not in name for name in sed.contribution_names])
+        LbolGAL = np.trapz(sed.luminosities[gal_mask,:].sum(axis=0), x=wavelength)
+        sed.add_info('agn.fracAGNTOR', LbolTOR / (LbolTOR + LbolGAL), True)
+
+        # AGN fraction as defined in Dale+2014:
+        # the luminosity fraction over 5-20 micron
+        mask_wave_range_Dale = np.logical_and(wavelength >= 5000, wavelength <= 20000)
+        LDaleAGN = np.trapz(
+            sed.luminosities[~gal_mask,:][:,mask_wave_range_Dale].sum(axis=0),
+            x=wavelength[mask_wave_range_Dale])
+        LDaleGal = np.trapz(
+            sed.luminosities[gal_mask,:][:,mask_wave_range_Dale].sum(axis=0),
+            x=wavelength[mask_wave_range_Dale])
+        sed.add_info('agn.fracAGNDale', LDaleAGN / (LDaleAGN + LDaleGal), True)
+
+        # Compute expected normalised excess variance.
         # from Simm+16 Table 3 empirical relation.
         # from Simm+16 Table 3: normalised excess variance as a function of Lbol
         # NEV = min(0.1, 10**(-1.43 - 0.74 * np.log10(Lbol / 1e45)))
-        
         NEV = min(0.1, 10**(-1.43 - 0.74 * np.log10(LbolBBB * 1e7 / 1e45)))
         sed.add_info('agn.NEV', NEV)
-    
+
 # CreationModule to be returned by get_module
 Module = ActivateBol

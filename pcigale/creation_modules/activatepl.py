@@ -124,7 +124,8 @@ class ActivatePL(CreationModule):
         sed.add_info('agn.uvslope', self.parameters["uvslope"])
         sed.add_info('agn.cutoff', self.parameters["cutoff"])
 
-        l_agn = sed.info["agn.lum5100A"]
+        # convert lamLlam into Llam
+        l_agn = sed.info["agn.lum5100A"] / 510
         
         assert (self.parameters["uvslope"] > self.parameters["plslope"]), (self.parameters["uvslope"], self.parameters["plslope"])
         bbb = np.empty_like(sed.wavelength_grid)

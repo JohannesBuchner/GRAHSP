@@ -58,7 +58,7 @@ class Activate(CreationModule):
                             "undefined.")
         assert l_agn >= 0, l_agn
         
-        sed.add_info('agn.lum5100A', l_agn, scales_with_mass)
+        sed.add_info('agn.lum5100A', l_agn * 510, scales_with_mass)
 
 # CreationModule to be returned by get_module
 Module = Activate

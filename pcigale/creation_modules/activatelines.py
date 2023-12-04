@@ -15,11 +15,49 @@ import numpy as np
 from pcigale.data import Database
 from . import CreationModule
 import scipy.constants as cst
+from scipy.special import erf
 
 fwhm_to_sigma_conversion = 1 / (2 * np.sqrt(2 * np.log(2)))
 
+def blackbody_flux_frequency(T_K, wavelength_nm):
+    """Planck Law in flux per unit frequency.
 
-        
+    Parameters
+    ----------
+    T_K
+        Temperature in Kelvin.
+    wavelength_nm: float
+        Wavelength in nm.
+
+    Returns
+    -------
+    flux: float
+        spectral flux density per unit frequency.
+    """
+    # (Planck constant h) * (speed of light) / (Boltzmann constant k_B) in nm * K
+    h_c_per_k_B = 1.439e7
+    return (wavelength_nm**-3) / (np.expm1(h_c_per_k_B / (T_K * wavelength_nm)))
+
+def blackbody_flux_wavelength(T_K, wavelength_nm):
+    """Planck Law in flux per unit wavelength.
+
+    Parameters
+    ----------
+    T_K
+        Temperature in Kelvin.
+    wavelength_nm: float
+        Wavelength in nm.
+
+    Returns
+    -------
+    flux: float
+        spectral flux density per unit frequency.
+    """
+    # (Planck constant h) * (speed of light) / (Boltzmann constant k_B) in nm * K
+    h_c_per_k_B = 1.439e7
+    return (wavelength_nm**-5) / (np.expm1(h_c_per_k_B / (T_K * wavelength_nm)))
+
+
 class ActivateLines(CreationModule):
     """Activate AGN Emission lines (BL, Sy2 or LINER), and FeII forest
     """
@@ -45,6 +83,11 @@ class ActivateLines(CreationModule):
             'float',
             "Factor to multiply Netzer's typical equivalent widths.",
             1
+        )),
+        ('ABC', (
+            'float',
+            "Strength of the Balmer continuum relative to the powerlaw at 3000nm.",
+            0.3
         )),
     ])
 
@@ -84,6 +127,49 @@ class ActivateLines(CreationModule):
         self.agnType = self.parameters["AGNtype"]
         self.AFeII = self.parameters["AFeII"]
         self.Alines = self.parameters["Alines"]
+        self.ABC = self.parameters["ABC"]
+        
+        # compute Balmer continuum following Grandi (1982)
+        # Balmer edge wavelength in nm
+        self.BE_wave = 364.6
+        # Balmer continuum optical depth
+        self.BC_tau = 1.0
+        # Black body temperature in Kelvin
+        self.BC_T = 15000
+        self.BC_wave = self.fe2.wave[self.fe2.wave <= self.BE_wave]
+        self.BC_wave_ratio = self.BC_wave / self.BE_wave
+        # compute Balmer black-body
+        # (Planck constant h) * (speed of light) / (Boltzmann constant k_B) in nm * K
+        h_c_per_k_B = 1.439e7
+        black_body_BC = (self.BC_wave**-5) / np.expm1(h_c_per_k_B / (self.BC_T * self.BC_wave))
+        truncation = -np.expm1(-self.BC_tau * self.BC_wave_ratio**3)
+        black_body_BC0 = (self.BE_wave**-5) / np.expm1(h_c_per_k_B / (self.BC_T * self.BE_wave))
+        truncation0 = -np.expm1(-self.BC_tau)
+
+        # the following is based on a derivation of 
+        # convolving a gaussian with a linear approximation
+        #    truncation ~= alpha * x + beta
+        # with the values:
+        alpha = 1.8
+        beta = -0.8
+        # this leads to a Gaussian CDF term (termB) and a
+        #   more complicated result from the x * Gaussian(x) integration (termA1-3)
+        sigma = (self.lines_width * 1000) / cst.c 
+        x = self.BC_wave_ratio
+        z = (x - 1) * 2**-0.5 / sigma
+        termB = 0.5 * (1 - erf(z))
+        termA1 = 0.5 * x
+        termA2 = -0.5 * x * erf(z)
+        termA3 = -sigma * (2 * np.pi)**-0.5 * np.exp(-z**2)
+        convolved = (beta * termB + alpha * (termA1 + termA2 + termA3)) * (1 - np.exp(-1))
+        # 250 nm is >3 sigma away from the balmer edge up to 30000km/s
+        #   below we can use the original truncation formula
+        truncation_convolved = np.where(self.BC_wave > 250, convolved, truncation)
+
+        self.BC = black_body_BC / black_body_BC0 * truncation_convolved / truncation0
+
+
+
 
     def process(self, sed):
         """Add the line contributions
@@ -94,7 +180,7 @@ class ActivateLines(CreationModule):
 
         """
 
-        self.l_agn = sed.info['agn.lum5100A']
+        self.l_agn = sed.info['agn.lum5100A'] / 510
         l_broadlines = 0.02 * self.l_agn * self.Alines
         l_narrowlines = 0.002 * self.l_agn * self.Alines
         
@@ -102,6 +188,7 @@ class ActivateLines(CreationModule):
         sed.add_info('agn.AFeII', self.AFeII)
         sed.add_info('agn.Alines', self.Alines)
         sed.add_info('agn.type', self.agnType)
+        sed.add_info('agn.ABC', self.ABC)
 
         if self.agnType == 1: # BLAGN
             self.add_lines(sed, 'agn.activate_EmLines_BL', self.emLines.wave,
@@ -112,6 +199,8 @@ class ActivateLines(CreationModule):
             l_fe2 = self.AFeII * l_broadlines
             sed.add_contribution('agn.activate_FeLines', self.fe2.wave,
                                  l_fe2 * self.fe2.lumin)
+            l_BC = self.l_agn * self.ABC
+            sed.add_contribution('agn.activate_BC', self.BC_wave, l_BC * self.BC)
         elif self.agnType == 2: # Sy2
             self.add_lines(sed, 'agn.activate_EmLines_NL', self.emLines.wave,
                                  l_narrowlines * self.emLines.lumin_Sy2, self.narrow_lines_width)

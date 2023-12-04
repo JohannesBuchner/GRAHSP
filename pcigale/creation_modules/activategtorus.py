@@ -133,18 +133,19 @@ class ActivateGTorus(CreationModule):
         # l_torus * 12um = 2.5 * l_agn * 510nm * fcov
         # l_agn is defined at 510nm, l_torus at 12um
         # because both are nu*L_nu = lam*L_lam normalisations, we need a
-        l_torus = 2.5 * l_agn * fcov / 12.0 * 0.510
+        l_torus = 2.5 * l_agn * fcov
         sed.add_info('agn.lum12um', l_torus, True, unit='W/nm')
 
+        # log-normal distribution on L_lambda/lambda
         cool_spectrum = exp(-((self.log_wave - logCOOLlam) / COOLwidth)**2)
         
         hot_spectrum = HOTfcov * 10**(logCOOLlam - logHOTlam) * exp(-((self.log_wave - logHOTlam) / HOTwidth)**2)
         total_spectrum = cool_spectrum + hot_spectrum
         # apply normalisation at 12 um:
-        torus_spectrum = l_torus * total_spectrum / total_spectrum[self.norm_index]
+        torus_spectrum = l_torus / 12000 * total_spectrum / total_spectrum[self.norm_index]
         sed.add_contribution('agn.activate_Torus', self.wave, torus_spectrum)
 
-        si_spectrum = l_torus * Si * (
+        si_spectrum = l_torus / 12000 * Si * (
             SiEmAmpl * exp(-0.5 * ((sed.wavelength_grid - SiEmlam) / SiEmWidth)**2) - 
             SiAbsAmpl * exp(-0.5 * ((sed.wavelength_grid - SiAbslam) / SiAbsWidth)**2))
         # avoid negative fluxes, truncate to zero flux if the sum would go below zero
@@ -152,7 +153,7 @@ class ActivateGTorus(CreationModule):
         si_spectrum[mask_negative] = -sed.luminosities[-1,mask_negative]
         sed.add_contribution('agn.activate_Torus_Si', sed.wavelength_grid, si_spectrum)
         l_torus_6um = np.interp(6000., self.wave, torus_spectrum)
-        sed.add_info('agn.lum6um', l_torus_6um, True, unit='W/nm')
+        sed.add_info('agn.lum6um', l_torus_6um * 6000, True, unit='W/nm')
 
 
 # CreationModule to be returned by get_module
