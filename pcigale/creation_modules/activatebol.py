@@ -42,7 +42,7 @@ class ActivateBol(CreationModule):
         sed.add_info('agn.lumBolTOR', LbolTOR, True)
 
         # compute ratio of TOR to BBB
-        sed.add_info('agn.fcov', LbolTOR / LbolBBB, True)
+        sed.add_info('agn.ratioTORBBB', LbolTOR / LbolBBB, True)
 
         # Compute AGN fraction with this luminosity
         gal_mask = np.array(['activate' not in name for name in sed.contribution_names])
