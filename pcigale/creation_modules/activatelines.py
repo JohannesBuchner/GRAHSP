@@ -87,7 +87,7 @@ class ActivateLines(CreationModule):
         ('ABC', (
             'float',
             "Strength of the Balmer continuum relative to the powerlaw at 3000nm.",
-            0.3
+            0.0
         )),
     ])
 
@@ -199,8 +199,9 @@ class ActivateLines(CreationModule):
             l_fe2 = self.AFeII * l_broadlines
             sed.add_contribution('agn.activate_FeLines', self.fe2.wave,
                                  l_fe2 * self.fe2.lumin)
-            l_BC = self.l_agn * self.ABC
-            sed.add_contribution('agn.activate_BC', self.BC_wave, l_BC * self.BC)
+            if self.ABC > 0:
+                l_BC = self.l_agn * self.ABC
+                sed.add_contribution('agn.activate_BC', self.BC_wave, l_BC * self.BC)
         elif self.agnType == 2: # Sy2
             self.add_lines(sed, 'agn.activate_EmLines_NL', self.emLines.wave,
                                  l_narrowlines * self.emLines.lumin_Sy2, self.narrow_lines_width)
