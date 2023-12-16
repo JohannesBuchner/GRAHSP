@@ -128,45 +128,46 @@ class ActivateLines(CreationModule):
         self.AFeII = self.parameters["AFeII"]
         self.Alines = self.parameters["Alines"]
         self.ABC = self.parameters["ABC"]
-        
-        # compute Balmer continuum following Grandi (1982)
-        # Balmer edge wavelength in nm
-        self.BE_wave = 364.6
-        # Balmer continuum optical depth
-        self.BC_tau = 1.0
-        # Black body temperature in Kelvin
-        self.BC_T = 15000
-        self.BC_wave = self.fe2.wave[self.fe2.wave <= self.BE_wave]
-        self.BC_wave_ratio = self.BC_wave / self.BE_wave
-        # compute Balmer black-body
-        # (Planck constant h) * (speed of light) / (Boltzmann constant k_B) in nm * K
-        h_c_per_k_B = 1.439e7
-        black_body_BC = (self.BC_wave**-5) / np.expm1(h_c_per_k_B / (self.BC_T * self.BC_wave))
-        truncation = -np.expm1(-self.BC_tau * self.BC_wave_ratio**3)
-        black_body_BC0 = (self.BE_wave**-5) / np.expm1(h_c_per_k_B / (self.BC_T * self.BE_wave))
-        truncation0 = -np.expm1(-self.BC_tau)
 
-        # the following is based on a derivation of 
-        # convolving a gaussian with a linear approximation
-        #    truncation ~= alpha * x + beta
-        # with the values:
-        alpha = 1.8
-        beta = -0.8
-        # this leads to a Gaussian CDF term (termB) and a
-        #   more complicated result from the x * Gaussian(x) integration (termA1-3)
-        sigma = (self.lines_width * 1000) / cst.c 
-        x = self.BC_wave_ratio
-        z = (x - 1) * 2**-0.5 / sigma
-        termB = 0.5 * (1 - erf(z))
-        termA1 = 0.5 * x
-        termA2 = -0.5 * x * erf(z)
-        termA3 = -sigma * (2 * np.pi)**-0.5 * np.exp(-z**2)
-        convolved = (beta * termB + alpha * (termA1 + termA2 + termA3)) * (1 - np.exp(-1))
-        # 250 nm is >3 sigma away from the balmer edge up to 30000km/s
-        #   below we can use the original truncation formula
-        truncation_convolved = np.where(self.BC_wave > 250, convolved, truncation)
+        if self.ABC > 0:
+            # compute Balmer continuum following Grandi (1982)
+            # Balmer edge wavelength in nm
+            self.BE_wave = 364.6
+            # Balmer continuum optical depth
+            self.BC_tau = 1.0
+            # Black body temperature in Kelvin
+            self.BC_T = 15000
+            self.BC_wave = self.fe2.wave[self.fe2.wave <= self.BE_wave]
+            self.BC_wave_ratio = self.BC_wave / self.BE_wave
+            # compute Balmer black-body
+            # (Planck constant h) * (speed of light) / (Boltzmann constant k_B) in nm * K
+            h_c_per_k_B = 1.439e7
+            black_body_BC = (self.BC_wave**-5) / np.expm1(h_c_per_k_B / (self.BC_T * self.BC_wave))
+            truncation = -np.expm1(-self.BC_tau * self.BC_wave_ratio**3)
+            black_body_BC0 = (self.BE_wave**-5) / np.expm1(h_c_per_k_B / (self.BC_T * self.BE_wave))
+            truncation0 = -np.expm1(-self.BC_tau)
 
-        self.BC = black_body_BC / black_body_BC0 * truncation_convolved / truncation0
+            # the following is based on a derivation of 
+            # convolving a gaussian with a linear approximation
+            #    truncation ~= alpha * x + beta
+            # with the values:
+            alpha = 1.8
+            beta = -0.8
+            # this leads to a Gaussian CDF term (termB) and a
+            #   more complicated result from the x * Gaussian(x) integration (termA1-3)
+            sigma = (self.lines_width * 1000) / cst.c 
+            x = self.BC_wave_ratio
+            z = (x - 1) * 2**-0.5 / sigma
+            termB = 0.5 * (1 - erf(z))
+            termA1 = 0.5 * x
+            termA2 = -0.5 * x * erf(z)
+            termA3 = -sigma * (2 * np.pi)**-0.5 * np.exp(-z**2)
+            convolved = (beta * termB + alpha * (termA1 + termA2 + termA3)) * (1 - np.exp(-1))
+            # 250 nm is >3 sigma away from the balmer edge up to 30000km/s
+            #   below we can use the original truncation formula
+            truncation_convolved = np.where(self.BC_wave > 250, convolved, truncation)
+
+            self.BC = black_body_BC / black_body_BC0 * truncation_convolved / truncation0
 
 
 
