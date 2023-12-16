@@ -40,6 +40,10 @@ class ActivateBol(CreationModule):
         TOR_luminosity = sed.luminosities[agn_TOR_mask,:].sum(axis=0)
         LbolTOR = np.trapz(y=TOR_luminosity, x=wavelength)
         sed.add_info('agn.lumBolTOR', LbolTOR, True)
+
+        # compute ratio of TOR to BBB
+        sed.add_info('agn.fcov', LbolTOR / LbolBBB, True)
+
         # Compute AGN fraction with this luminosity
         gal_mask = np.array(['activate' not in name for name in sed.contribution_names])
         LbolGAL = np.trapz(sed.luminosities[gal_mask,:].sum(axis=0), x=wavelength)
