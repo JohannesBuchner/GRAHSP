@@ -42,12 +42,12 @@ class ActivateBol(CreationModule):
         sed.add_info('agn.lumBolTOR', LbolTOR, True)
 
         # compute ratio of TOR to BBB
-        sed.add_info('agn.ratioTORBBB', LbolTOR / LbolBBB, True)
+        sed.add_info('agn.ratioTORBBB', LbolTOR / LbolBBB, False)
 
         # Compute AGN fraction with this luminosity
         gal_mask = np.array(['activate' not in name for name in sed.contribution_names])
         LbolGAL = np.trapz(sed.luminosities[gal_mask,:].sum(axis=0), x=wavelength)
-        sed.add_info('agn.fracAGNTOR', LbolTOR / (LbolTOR + LbolGAL), True)
+        sed.add_info('agn.fracAGNTOR', LbolTOR / (LbolTOR + LbolGAL), False)
 
         # AGN fraction as defined in Dale+2014:
         # the luminosity fraction over 5-20 micron
@@ -58,7 +58,7 @@ class ActivateBol(CreationModule):
         LDaleGal = np.trapz(
             sed.luminosities[gal_mask,:][:,mask_wave_range_Dale].sum(axis=0),
             x=wavelength[mask_wave_range_Dale])
-        sed.add_info('agn.fracAGNDale', LDaleAGN / (LDaleAGN + LDaleGal), True)
+        sed.add_info('agn.fracAGNDale', LDaleAGN / (LDaleAGN + LDaleGal), False)
 
         # Compute expected normalised excess variance.
         # from Simm+16 Table 3 empirical relation.
