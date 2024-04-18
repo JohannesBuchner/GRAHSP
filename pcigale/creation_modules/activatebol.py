@@ -42,7 +42,7 @@ class ActivateBol(CreationModule):
         sed.add_info('agn.lumBolTOR', LbolTOR, True)
 
         # compute ratio of TOR to BBB
-        sed.add_info('agn.ratioTORBBB', LbolTOR / LbolBBB, False)
+        sed.add_info('agn.ratioTORBBB', LbolTOR / LbolBBB if LbolBBB>0 else np.nan, False)
 
         # Compute AGN fraction with this luminosity
         gal_mask = np.array(['activate' not in name for name in sed.contribution_names])
@@ -64,7 +64,7 @@ class ActivateBol(CreationModule):
         # from Simm+16 Table 3 empirical relation.
         # from Simm+16 Table 3: normalised excess variance as a function of Lbol
         # NEV = min(0.1, 10**(-1.43 - 0.74 * np.log10(Lbol / 1e45)))
-        NEV = min(0.1, 10**(-1.43 - 0.74 * np.log10(LbolBBB * 1e7 / 1e45)))
+        NEV = min(0.1, 10**(-1.43 - 0.74 * np.log10(LbolBBB * 1e7 / 1e45 + 1e-10)))
         sed.add_info('agn.NEV', NEV)
 
 # CreationModule to be returned by get_module
