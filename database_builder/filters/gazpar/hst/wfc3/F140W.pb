@@ -1,4 +1,4 @@
-# F140W
+# hst.wfc3.F140W
 # photon
 # calib 0
 # F140W WFC3 from Peter Capak web page 

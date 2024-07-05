@@ -1,4 +1,4 @@
-# F160W_nicmos
+# hst.nicmos.F160W
 # photon
 # calib 0
 # F160W from NICMOS (Peter Capak web page) 

@@ -142,7 +142,8 @@ from  pcigale.data import DatabaseInsertError
 
 def build_filters(base):
     filters_dir = os.path.join(os.path.dirname(__file__), 'filters/')
-    for filter_file in sorted(glob.glob(filters_dir + '*.dat')) + sorted(glob.glob(filters_dir + 'gazpar/**/*.pb', recursive=True)):
+    for filter_file in sorted(glob.glob(filters_dir + '*.dat')) + sorted(glob.glob(filters_dir + 'gazpar/**/*.pb', recursive=True)) + sorted(glob.glob(filters_dir + 'jwst/**/*.dat', recursive=True)):
+        # filter_name2 = '.'.join(filter_file.replace(filters_dir, '').replace('gazpar/', '').split('/')[:-1])
         with open(filter_file, 'r') as filter_file_read:
             filter_name = filter_file_read.readline().strip('# \n\t')
             filter_type = filter_file_read.readline().strip('# \n\t')

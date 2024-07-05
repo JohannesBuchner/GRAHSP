@@ -1,4 +1,4 @@
-# F606W
+# hst.wfc.F606W
 # photon
 # calib 0
 # F606 ACS/WFC http://www.stsci.edu/hst/acs/analysis/throughputs in photons

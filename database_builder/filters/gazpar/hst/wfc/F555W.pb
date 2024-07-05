@@ -1,4 +1,4 @@
-# F555W
+# hst.wfc.F555W
 # photon
 # calib 0
 # F555 ACS/WFC http://www.stsci.edu/hst/acs/analysis/throughputs in photons

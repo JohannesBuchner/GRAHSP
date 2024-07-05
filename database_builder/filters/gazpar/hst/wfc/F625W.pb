@@ -1,4 +1,4 @@
-# F625W
+# hst.wfc.F625W
 # photon
 # calib 0
 # F625 ACS/WFC http://www.stsci.edu/hst/acs/analysis/throughputs

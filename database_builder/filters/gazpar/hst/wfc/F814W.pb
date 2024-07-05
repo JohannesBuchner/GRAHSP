@@ -1,4 +1,4 @@
-# F814W
+# hst.wfc.F814W
 # photon
 # calib 0
 # F814 ACS/WFC http://www.stsci.edu/hst/acs/analysis/throughputs 

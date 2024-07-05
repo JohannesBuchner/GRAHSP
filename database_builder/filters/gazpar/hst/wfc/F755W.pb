@@ -1,4 +1,4 @@
-# F755W
+# hst.wfc.F755W
 # photon
 # calib 0
 # F755 ACS/WFC http://www.stsci.edu/hst/acs/analysis/throughputs 

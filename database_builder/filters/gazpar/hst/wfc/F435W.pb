@@ -1,4 +1,4 @@
-# F435W
+# hst.wfc.F435W
 # photon
 # calib 0
 # F435 ACS/WFC http://www.stsci.edu/hst/acs/analysis/throughputs 

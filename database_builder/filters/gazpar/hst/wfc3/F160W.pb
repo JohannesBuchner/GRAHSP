@@ -1,4 +1,4 @@
-# F160W
+# hst.wfc3.F160W
 # photon
 # calib 0
 # F160W WFC3 from Peter Capak web page 
