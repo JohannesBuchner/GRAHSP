@@ -1,3 +1,3 @@
 Python Code Investigating Galaxy Emission
 
-see GRAHSP-run github repository for GRAHSP installation instructions
+see the `GRAHSP-run <https://github.com/JohannesBuchner/GRAHSP-run/>`_ github repository for GRAHSP installation instructions
