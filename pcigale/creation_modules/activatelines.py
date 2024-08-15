@@ -63,6 +63,11 @@ class ActivateLines(CreationModule):
     """
 
     parameter_list = OrderedDict([
+        ('FeIItemplate', (
+            'str',
+            "Template to use: 'BruhweilerVerner08' (default), 'Veron-Cetty04'",
+            "BruhweilerVerner08"
+        )),
         ('AFeII', (
             'float',
             "Strength of FeII lines compared to Hb. Reasonable values are within 2-10",
@@ -94,7 +99,7 @@ class ActivateLines(CreationModule):
     def _init_code(self):
         """Get the template set out of the database"""
         with Database() as base:
-            self.fe2 = base.get_ActivateFeIIferland()
+            self.fe2 = base.get_ActivateFeII(self.parameters["FeIItemplate"])
             assert self.fe2.wave.shape == self.fe2.lumin.shape, (self.fe2.wave.shape, self.fe2.lumin.shape)
             assert (self.fe2.lumin >= 0).all()
             self.emLines = base.get_ActivateMorNetzerEmLines()

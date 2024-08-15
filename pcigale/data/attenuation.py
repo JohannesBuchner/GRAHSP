@@ -3,8 +3,6 @@
 # Licensed under the CeCILL-v2 licence - see Licence_CeCILL_V2-en.txt
 # Author: Johannes Buchner
 
-# NetzerDisk, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines
-
 class AttenuationLaw(object):
     """Attenuation law model """
 

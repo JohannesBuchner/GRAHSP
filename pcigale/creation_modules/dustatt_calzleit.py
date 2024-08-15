@@ -257,10 +257,12 @@ class CalzLeit(CreationModule):
 
         attenuation_total = 0.
         for contrib in list(sed.contribution_names):
+            if contrib.startswith('attenuation.'):
+                continue
             age = contrib.split('.')[-1].split('_')[-1]
             luminosity = sed.get_lumin_contribution(contrib)
             attenuated_luminosity = (luminosity * 10 **
-                                     (ebvs[age] * self.sel_attenuation / -2.5))
+                                     (ebvs.get(age, ebvs['young']) * self.sel_attenuation / -2.5))
             attenuation_spectrum = attenuated_luminosity - luminosity
             # We integrate the amount of luminosity attenuated (-1 because the
             # spectrum is negative).
@@ -268,7 +270,7 @@ class CalzLeit(CreationModule):
             attenuation_total += attenuation
 
             sed.add_module(self.name, self.parameters)
-            sed.add_info("attenuation.E_BVs." + contrib, ebvs[age])
+            sed.add_info("attenuation.E_BVs." + contrib, ebvs.get(age, ebvs['young']))
             sed.add_info("attenuation." + contrib, attenuation, True)
             sed.add_contribution("attenuation." + contrib, wavelength,
                                  attenuation_spectrum)
@@ -285,8 +287,9 @@ class CalzLeit(CreationModule):
         flux_att = {filt: sed.compute_fnu(filt) for filt in self.filter_list}
 
         # Attenuation in each filter
-        for filt in self.filter_list:
-            sed.add_info("attenuation." + filt,
+        with np.errstate(invalid='ignore'):
+            for filt in self.filter_list:
+                sed.add_info("attenuation." + filt,
                          -2.5 * np.log10(flux_att[filt] / flux_noatt[filt]))
 
         sed.add_info('attenuation.ebvs_main', ebvs['old'])

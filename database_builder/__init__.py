@@ -23,7 +23,7 @@ from astropy.table import Table
 from pcigale.data import (Database, Filter, M2005, BC03, Fritz2006,
                           Dale2014, DL2007, DL2014, NebularLines,
                           NebularContinuum, 
-                          NetzerDisk, Pacifici2012Gal, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines,
+                          NetzerDisk, Pacifici2012Gal, MorNetzer2012Torus, FeII, MorNetzerEmLines,
                           AttenuationLaw)
 
 
@@ -864,31 +864,35 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
     
     
     # FeII template
-    print("Importing Activate FeIIferland ...")
-    data = np.genfromtxt(activate_dir + "agn/FeII_template/Fe_d11-m20-20.5.txt")
-    wavez = data[:,0]
-    # this template is slightly redshifted, by z=0.004
-    z = 4593.4/4575 - 1
-    wave = wavez / (1+z)
-    Lnu = data[:,1]
-    assert wave.shape == Lnu.shape, (wave.shape, Lnu.shape)
-    Llam = Lnu * c / wavez**2
-    assert wave.shape == Llam.shape, (wave.shape, Llam.shape)
-    assert (Llam >= 0).all(), Llam
-    # normalisation at FeII 4575
-    norm1 = np.max(Llam[wavez == 4593.4])
-    #norm = np.interp(457.5, wave, Llam)
-    # normalisation over entire wavelength
-    norm = np.trapz(Llam, x=wave*0.1)
-    norm = norm1
-    assert norm > 0, (norm, Llam)
-    Llam = Llam / norm
-    #print('    largest luminosity after normalising:', np.max(Llam))
-    print('    FeII normalisation:', norm, norm1/norm)
-    assert norm == 8.30E+06 * c / 4593.4**2, (norm, 8.30E+06 * c / 4593.4**2, np.max(Llam))
-    assert wave.shape == Llam.shape, (wave.shape, Llam.shape)
-    base.add_ActivateFeIIferland(FeIIferland(wave * 0.1, Llam))
-    del Llam, norm, wave
+    print("Importing Activate FeII ...")
+    for FeIImodelname, filename, z in [
+        # this template is slightly redshifted, by z=0.004
+        ('BruhweilerVerner08', 'Fe_d11-m20-20.5.txt', 4593.4/4575 - 1), 
+        ('Veron-Cetty04', 'Veron-Cetty_template.txt', 0)]:
+        #data = np.genfromtxt(activate_dir + "agn/FeII_template/Fe_d11-m20-20.5.txt")
+        data = np.genfromtxt(activate_dir + "agn/FeII_template/" + filename)
+        wavez = data[:,0]
+        wave = wavez / (1+z)
+        Lnu = data[:,1]
+        assert wave.shape == Lnu.shape, (wave.shape, Lnu.shape)
+        Llam = Lnu * c / wavez**2
+        assert wave.shape == Llam.shape, (wave.shape, Llam.shape)
+        assert (Llam >= 0).all(), Llam
+        # normalisation at FeII 4575
+        print(wave[np.argmin(np.abs(wave - 4575))], wavez[np.argmin(np.abs(wave - 4575))])
+        norm1 = np.max(Llam[np.argmin(np.abs(wave - 4575))])
+        #norm = np.interp(457.5, wave, Llam)
+        # normalisation over entire wavelength
+        norm = np.trapz(Llam, x=wave*0.1)
+        norm = norm1
+        assert norm > 0, (norm, Llam)
+        Llam = Llam / norm
+        #print('    largest luminosity after normalising:', np.max(Llam))
+        print('    FeII normalisation:', norm, norm1/norm)
+        #assert norm == 8.30E+06 * c / 4593.4**2, (norm, 8.30E+06 * c / 4593.4**2, np.max(Llam))
+        assert wave.shape == Llam.shape, (wave.shape, Llam.shape)
+        base.add_ActivateFeII(FeII(FeIImodelname, wave * 0.1, Llam))
+        del Llam, norm, wave, FeIImodelname
     
     # Emission line list & strengths
     print("Importing Activate MorNetzerEmLines ...")

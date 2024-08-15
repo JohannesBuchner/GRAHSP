@@ -3,7 +3,7 @@
 # Licensed under the CeCILL-v2 licence - see Licence_CeCILL_V2-en.txt
 # Author: Johannes Buchner
 
-# NetzerDisk, MorNetzer2012Torus, FeIIferland, MorNetzerEmLines
+# NetzerDisk, MorNetzer2012Torus, FeII, MorNetzerEmLines
 
 class NetzerDisk(object):
     """AGN disk emission model.
@@ -54,12 +54,13 @@ class MorNetzer2012Torus(object):
         self.lumin = lumin
 
 
-class FeIIferland(object):
+class FeII(object):
     """FeII forest model."""
 
-    def __init__(self, wave, lumin):
+    def __init__(self, name, wave, lumin):
         """Create a new torus model"""
 
+        self.name = name
         self.wave = wave
         self.lumin = lumin
 

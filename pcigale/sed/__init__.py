@@ -364,7 +364,7 @@ class SED(object):
         """
         sed = SED()
         if self._sfh is not None:
-            sed._sfh = (self._sfh[0], self._sfh[1])
+            sed._sfh = self._sfh
         sed.modules = self.modules[:]
         if self.wavelength_grid is not None:
             sed.wavelength_grid = self.wavelength_grid.copy()

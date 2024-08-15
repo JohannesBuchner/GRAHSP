@@ -82,6 +82,31 @@ class BiAttenuationLaw(CreationModule):
         else:
             self.filter_list = []
 
+    def get_attenuation(self, sed):
+        """Compute the dust attenuation curve to apply.
+
+        Parameters
+        ----------
+        sed: pcigale.sed.SED object
+
+        """
+        wavelength = sed.wavelength_grid
+        law_index_OPT = self.parameters["OPT_index"]
+        law_index_NIR = self.parameters["NIR_index"]
+        law_lam_break = self.parameters["lam_break"]
+        law_norm = self.parameters["norm"]
+
+        # handle only part where attenuation matters
+        wavelength_negligible_attenuation = wavelength > 40000
+        if np.any(wavelength_negligible_attenuation) and False:
+            imax = np.where(wavelength_negligible_attenuation)[0][0]
+        else:
+            imax = None
+        attenuation_curve = (law_norm * (wavelength[:imax] / law_lam_break)**(
+            np.where(wavelength[:imax] < law_lam_break, law_index_OPT, law_index_NIR))
+        )
+        return attenuation_curve, imax
+
     def process(self, sed):
         """Add the dust attenuation to the SED.
 
@@ -92,10 +117,8 @@ class BiAttenuationLaw(CreationModule):
         """
         wavelength = sed.wavelength_grid
 
-        law_index_OPT = self.parameters["OPT_index"]
-        law_index_NIR = self.parameters["NIR_index"]
-        law_lam_break = self.parameters["lam_break"]
-        law_norm = self.parameters["norm"]
+        attenuation_curve1, imax = self.get_attenuation(sed)
+        attenuation_curve = attenuation_curve1.reshape((1, -1))
         e_bv = self.parameters["E(B-V)"]
         e_bv_agn = self.parameters["E(B-V)-AGN"]
 
@@ -111,16 +134,6 @@ class BiAttenuationLaw(CreationModule):
         for i, contrib in enumerate(sed.contribution_names):
             mask_agn_contrib[i] = 'activate' in contrib
             del i, contrib
-
-        # handle only part where attenuation matters
-        wavelength_negligible_attenuation = wavelength > 40000
-        if np.any(wavelength_negligible_attenuation) and False:
-            imax = np.where(wavelength_negligible_attenuation)[0][0]
-        else:
-            imax = None
-        attenuation_curve = (law_norm * (wavelength[:imax] / law_lam_break)**(
-            np.where(wavelength[:imax] < law_lam_break, law_index_OPT, law_index_NIR))
-        ).reshape((1, -1))
 
         if self.store_component_attenuation:
             attenuated_luminosities = sed.luminosities.copy()

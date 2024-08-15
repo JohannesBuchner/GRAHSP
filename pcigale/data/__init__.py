@@ -27,7 +27,7 @@ from .dale2014 import Dale2014
 from .dl2007 import DL2007
 from .dl2014 import DL2014
 from .fritz2006 import Fritz2006
-from .activate import NetzerDisk, MorNetzer2012Torus, Pacifici2012Gal, FeIIferland, MorNetzerEmLines
+from .activate import NetzerDisk, MorNetzer2012Torus, Pacifici2012Gal, FeII, MorNetzerEmLines
 from .attenuation import AttenuationLaw
 from .nebular_continuum import NebularContinuum
 from .nebular_lines import NebularLines
@@ -275,16 +275,16 @@ class _ActivateMorNetzer2012Torus(BASE):
 
 
 
-class _ActivateFeIIferland(BASE):
-    """Storage for FeIIferland  """
+class _ActivateFeII(BASE):
+    """Storage for FeII  """
 
-    __tablename__ = 'FeIIferland'
+    __tablename__ = 'FeII'
     name = Column(String, primary_key=True)
     wave = Column(PickleType)
     lumin = Column(PickleType)
 
     def __init__(self, torus):
-        self.name = self.__tablename__
+        self.name = torus.name
         self.wave = torus.wave
         self.lumin = torus.lumin
 
@@ -867,12 +867,12 @@ class Database(object):
         else:
             raise Exception('The database is not writable.')
 
-    def add_ActivateFeIIferland(self, agn):
+    def add_ActivateFeII(self, agn):
         """
         Add FeIIferland to the database.
         """
         if self.is_writable:
-            self.session.add(_ActivateFeIIferland(agn))
+            self.session.add(_ActivateFeII(agn))
             try:
                 self.session.commit()
             except exc.IntegrityError:
@@ -1006,16 +1006,16 @@ class Database(object):
         return self._get_parameters(_ActivateMorNetzer2012Torus)
 
 
-    def get_ActivateFeIIferland(self):
+    def get_ActivateFeII(self, name):
         """Get the NetzerTorus model """
-        result = (self.session.query(_ActivateFeIIferland).first())
+        result = (self.session.query(_ActivateFeII).filter(_ActivateFeII.name == name).first())
         if result:
-            return FeIIferland(result.wave, result.lumin)
+            return FeII(name, result.wave, result.lumin)
         else:
             raise DatabaseLookupError(
-                "The FeIIferland model is not in the database.")
+                "The FeII template is not in the database.")
 
-    def get_ActivateFeIIferland_parameters(self):
+    def get_ActivateFeII_parameters(self):
         """Get parameters for NetzerTorus models.
 
         Returns
@@ -1023,7 +1023,7 @@ class Database(object):
         paramaters: dictionary
             dictionary of parameters and their values
         """
-        return self._get_parameters(_ActivateFeIIferland)
+        return self._get_parameters(_ActivateFeII)
 
     def get_ActivateMorNetzerEmLines(self):
         """Get the NetzerTorus model """
