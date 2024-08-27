@@ -1,6 +1,6 @@
-# bok_r
+# 90prime_r
 # energy
-# bok_r
+# 90prime_r
 # 90Prime bokr (DECam r-like) filter curve: first column is wavelength in Angstrom; second columns is the response including both CCD QE and atmospheric extinction at airmass of 1.0.
 5550.00 0.000
 5560.00 0.001

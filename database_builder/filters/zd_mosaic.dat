@@ -1,7 +1,7 @@
-# zd_kp
+# zd_mosaic
 # energy
-# zd_kp
-# Area weighted transmission curve for zd filter (DECam style z filter for MOSAIC) k1038
+# zd_mosaic
+# Area weighted transmission curve for zd filter (DECam style z filter for MOSAIC-3) k1038 on Kitt Peak National Observatory, as used for Mayall z-band Legacy Survey (MzLS)
 8000.00    0.00665
 8010.00    0.00730
 8020.00    0.00798
