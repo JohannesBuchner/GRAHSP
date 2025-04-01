@@ -492,7 +492,8 @@ class Database(object):
         """
         result = self.session.query(_BC03)\
             .filter(_BC03.imf == imf)\
-            .filter(_BC03.metallicity == metallicity)\
+            .filter(_BC03.metallicity > metallicity - 0.00001)\
+            .filter(_BC03.metallicity < metallicity + 0.00001)\
             .first()
         if result:
             return BC03(result.imf, result.metallicity, result.time_grid,
