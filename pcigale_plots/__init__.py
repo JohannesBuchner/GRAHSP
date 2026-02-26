@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import multiprocessing as mp
 import numpy as np
 import os
-import pkg_resources
+import importlib.resources as importlib_resources
 from scipy.constants import c, parsec
 from pcigale.data import Database
 from pcigale.utils import read_table
@@ -55,10 +55,10 @@ def _chi2_worker(obj_name, var_name):
         ax = figure.add_subplot(111)
         ax.scatter(chi2[var_name], chi2['chi2'], color='k', s=.1)
         ax.set_xlabel(var_name)
-        ax.set_ylabel("Reduced $\chi^2$")
+        ax.set_ylabel(r"Reduced $\chi^2$")
         ax.set_ylim(0., )
         ax.minorticks_on()
-        figure.suptitle("Reduced $\chi^2$ distribution of {} for {}."
+        figure.suptitle(r"Reduced $\chi^2$ distribution of {} for {}."
                         .format(var_name, obj_name))
         figure.savefig(OUT_DIR + "{}_{}_chi2.pdf".format(obj_name, var_name))
         plt.close(figure)
@@ -306,25 +306,26 @@ def _sed_worker(obs, mod, filters, sed_type, nologo):
             ax2.set_xlim(xmin, xmax)
             ax2.set_ylim(-1.0, 1.0)
             if sed_type == 'lum':
-                ax2.set_xlabel("Rest-frame wavelength [$\mu$m]")
+                ax2.set_xlabel(r"Rest-frame wavelength [$\mu$m]")
                 ax1.set_ylabel("Luminosity [W]")
                 ax2.set_ylabel("Relative residual luminosity")
             else:
-                ax2.set_xlabel("Observed wavelength [$\mu$m]")
+                ax2.set_xlabel(r"Observed wavelength [$\mu$m]")
                 ax1.set_ylabel("Flux [mJy]")
                 ax2.set_ylabel("Relative residual flux")
             ax1.legend(fontsize=6, loc='best', fancybox=True, framealpha=0.5)
             ax2.legend(fontsize=6, loc='best', fancybox=True, framealpha=0.5)
             plt.setp(ax1.get_xticklabels(), visible=False)
             plt.setp(ax1.get_yticklabels()[1], visible=False)
-            figure.suptitle("Best model for {} at z = {}. Reduced $\chi^2$={}".
+            figure.suptitle(r"Best model for {} at z = {}. Reduced $\chi^2$={}".
                             format(obs['id'], np.round(obs['redshift'],
                                    decimals=3),
                                    np.round(mod['reduced_chi_square'],
                                             decimals=2)))
             if nologo is False:
-                image = plt.imread(pkg_resources.resource_filename(__name__,
-                                   "data/CIGALE.png"))
+                ref = importlib_resources.files('pcigale_plots') / 'data' / 'CIGALE.png'
+                with importlib_resources.as_file(ref) as path:
+                    image = plt.imread(path)
                 figure.figimage(image, 75, 330, origin='upper', zorder=10,
                                 alpha=1)
             figure.savefig(OUT_DIR + "{}_best_model.pdf".format(obs['id']))

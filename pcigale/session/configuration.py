@@ -4,7 +4,7 @@
 # Author: Yannick Roehlly
 
 import configobj
-import pkg_resources
+import importlib.resources as importlib_resources
 import pkgutil
 import collections
 collections.Iterable = collections.abc.Iterable
@@ -32,8 +32,9 @@ def list_modules(package_name):
         List of the available modules.
 
     """
-    directory = pkg_resources.resource_filename(package_name, '')
-    module_names = [name for _, name, _ in pkgutil.iter_modules([directory])]
+    ref = importlib_resources.files(package_name)
+    with importlib_resources.as_file(ref) as directory:
+        module_names = [name for _, name, _ in pkgutil.iter_modules([directory])]
 
     return module_names
 

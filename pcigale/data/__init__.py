@@ -15,7 +15,8 @@ SqlAlchemy ORM to store the data in a unique SQLite3 database.
 
 """
 
-import pkg_resources
+from contextlib import ExitStack
+import importlib.resources as importlib_resources
 from sqlalchemy import create_engine, exc, Column, String,  Float, PickleType
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import class_mapper, sessionmaker
@@ -32,8 +33,9 @@ from .attenuation import AttenuationLaw
 from .nebular_continuum import NebularContinuum
 from .nebular_lines import NebularLines
 
-
-DATABASE_FILE = pkg_resources.resource_filename(__name__, 'data.db')
+file_manager = ExitStack()
+ref = importlib_resources.files('pcigale.data') / 'data.db'
+DATABASE_FILE = str(file_manager.enter_context(importlib_resources.as_file(ref)))
 
 import os
 if os.environ.get('DB_IN_MEMORY', '0') == '1':
