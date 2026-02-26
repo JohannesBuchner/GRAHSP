@@ -81,7 +81,7 @@ class MBB(CreationModule):
                           cst.h * c / (self.wave * cst.k * T)) - 1.))
 
         # TODO, save the right normalisation factor to retrieve the dust mass
-        norm = np.trapz(self.lumin_mbb, x=self.wave)
+        norm = np.trapezoid(self.lumin_mbb, x=self.wave)
         self.lumin_mbb /= norm
 
     def process(self, sed):

@@ -124,9 +124,9 @@ class Fritz2006(CreationModule):
         if fracAGN < 1.:
             agn_power = luminosity * (1./(1.-fracAGN) - 1.)
             l_agn_therm = agn_power
-            l_agn_scatt = np.trapz(agn_power * self.fritz2006.lumin_scatt,
+            l_agn_scatt = np.trapezoid(agn_power * self.fritz2006.lumin_scatt,
                                    x=self.fritz2006.wave)
-            l_agn_agn = np.trapz(agn_power * self.fritz2006.lumin_agn,
+            l_agn_agn = np.trapezoid(agn_power * self.fritz2006.lumin_agn,
                                  x=self.fritz2006.wave)
             l_agn_total = l_agn_therm + l_agn_scatt + l_agn_agn
 

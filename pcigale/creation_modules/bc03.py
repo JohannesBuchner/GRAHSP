@@ -139,11 +139,11 @@ class BC03(CreationModule):
         # compute the energy absorbed by the dust before ionising gas.
         wave = self.ssp.wl
         w = np.where(wave <= 91.1)
-        lum_lyc_young, lum_lyc_old = np.trapz([spec_young[w], spec_old[w]],
+        lum_lyc_young, lum_lyc_old = np.trapezoid([spec_young[w], spec_old[w]],
                                               wave[w])
 
         # We do similarly for the total stellar luminosity
-        lum_young, lum_old = np.trapz([spec_young, spec_old], wave)
+        lum_young, lum_old = np.trapezoid([spec_young, spec_old], wave)
 
         sed.add_module(self.name, self.parameters)
 

@@ -143,8 +143,8 @@ class RestframeParam(CreationModule):
             self.w_D4000blue[key] = w_D4000blue
             self.w_D4000red[key] = w_D4000red
 
-        return (np.trapz(fnu[w_D4000red], x=wl[w_D4000red]) /
-                np.trapz(fnu[w_D4000blue], x=wl[w_D4000blue]))
+        return (np.trapezoid(fnu[w_D4000red], x=wl[w_D4000red]) /
+                np.trapezoid(fnu[w_D4000blue], x=wl[w_D4000blue]))
 
     def EW(self, sed):
         wl = sed.wavelength_grid
@@ -181,7 +181,7 @@ class RestframeParam(CreationModule):
             y = sed.luminosity[window]
             # guess continuum at the center
             y_mid = (y[0] + y[-1]) / 2
-            area = np.trapz(y=y - y_mid, x=x)
+            area = np.trapezoid(y=y - y_mid, x=x)
             if y_mid == 0:
                 EW = 0
             else:

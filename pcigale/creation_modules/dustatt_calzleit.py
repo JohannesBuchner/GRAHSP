@@ -266,7 +266,7 @@ class CalzLeit(CreationModule):
             attenuation_spectrum = attenuated_luminosity - luminosity
             # We integrate the amount of luminosity attenuated (-1 because the
             # spectrum is negative).
-            attenuation = -1 * np.trapz(attenuation_spectrum, wavelength)
+            attenuation = -1 * np.trapezoid(attenuation_spectrum, wavelength)
             attenuation_total += attenuation
 
             sed.add_module(self.name, self.parameters)

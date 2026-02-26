@@ -68,12 +68,12 @@ class Filter(object):
         """
         # normalise transmission to sum to unity
         self.trans_table[1] = self.trans_table[1] / (
-            np.trapz(self.trans_table[1], self.trans_table[0]))
+            np.trapezoid(self.trans_table[1], self.trans_table[0]))
 
         # calculation of the effective wavelength
         # actually, cigale computes the mean wavelength here, and wrongly
         # calls it effective wavelength
-        self.effective_wavelength = np.trapz(self.trans_table[1] *
+        self.effective_wavelength = np.trapezoid(self.trans_table[1] *
                                              self.trans_table[0],
                                              self.trans_table[0])
         
@@ -81,8 +81,8 @@ class Filter(object):
         # equ. A16 in Bessel & Murphy 2012
         S   = self.trans_table[1]
         lam = self.trans_table[0]
-        nominator   = np.trapz(lam*S, x=lam)
-        denominator = np.trapz(S/lam, x=lam)
+        nominator   = np.trapezoid(lam*S, x=lam)
+        denominator = np.trapezoid(S/lam, x=lam)
         pivot_wavelength = (nominator / denominator)**0.5
         # dump out information
         import json

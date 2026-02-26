@@ -75,7 +75,7 @@ class Casey2012(CreationModule):
                                np.exp(-(self.wave / lambda_c) ** 2.))
 
         # TODO, save the right normalisation factor to retrieve the dust mass
-        norm = np.trapz(self.lumin_powerlaw + self.lumin_blackbody,
+        norm = np.trapezoid(self.lumin_powerlaw + self.lumin_blackbody,
                         x=self.wave)
         self.lumin_powerlaw /= norm
         self.lumin_blackbody /= norm

@@ -146,11 +146,11 @@ class M2005(CreationModule):
         """
         out = self.convolve(sed.sfh)
         spec_young, spec_old, info_young, info_old, info_all = out
-        lum_young, lum_old = np.trapz([spec_young, spec_old], self.ssp.wl)
-        lum_ly_young, lum_ly_old = np.trapz(
+        lum_young, lum_old = np.trapezoid([spec_young, spec_old], self.ssp.wl)
+        lum_ly_young, lum_ly_old = np.trapezoid(
             [spec_young[self.mask_Q], spec_old[self.mask_Q]], self.wvl_H
         )
-        NLy_young, NLy_old = np.trapz([self.wvl_H * spec_young[self.mask_Q],
+        NLy_young, NLy_old = np.trapezoid([self.wvl_H * spec_young[self.mask_Q],
                                        self.wvl_H * spec_old[self.mask_Q]],
                                        x=self.wvl_H) * self.invhc * 1e-9
 

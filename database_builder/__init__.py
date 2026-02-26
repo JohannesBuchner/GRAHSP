@@ -451,7 +451,7 @@ def build_dale2014(base):
         lumin = lumin_with_stell - stell_emission_interp * constant
         lumin[lumin < 0] = 0
         lumin[wave < 2E3] = 0
-        norm = np.trapz(lumin, x=wave)
+        norm = np.trapezoid(lumin, x=wave)
         lumin = lumin/norm
 
         base.add_dale2014(Dale2014(fraction, alpha_grid[al-1], wave, lumin))
@@ -463,7 +463,7 @@ def build_dale2014(base):
     wave, lumin_quasar = np.genfromtxt(filename, unpack=True)
     wave *= 1e3
     lumin_quasar = 10**lumin_quasar / wave
-    norm = np.trapz(lumin_quasar, x=wave)
+    norm = np.trapezoid(lumin_quasar, x=wave)
     lumin_quasar = lumin_quasar / norm
 
     base.add_dale2014(Dale2014(1.0, 0.0, wave, lumin_quasar))
@@ -676,7 +676,7 @@ def build_fritz2006(base):
             lumin_scatt *= 1e-4
             lumin_agn *= 1e-4
             # Normalization of the lumin_therm to 1W
-            norm = np.trapz(lumin_therm, x=wave)
+            norm = np.trapezoid(lumin_therm, x=wave)
             lumin_therm = lumin_therm / norm
             lumin_scatt = lumin_scatt / norm
             lumin_agn = lumin_agn / norm
@@ -883,7 +883,7 @@ def build_activate(base, fine_netzer_disk=False, all_spins=False):
         norm1 = np.max(Llam[np.argmin(np.abs(wave - 4575))])
         #norm = np.interp(457.5, wave, Llam)
         # normalisation over entire wavelength
-        norm = np.trapz(Llam, x=wave*0.1)
+        norm = np.trapezoid(Llam, x=wave*0.1)
         norm = norm1
         assert norm > 0, (norm, Llam)
         Llam = Llam / norm

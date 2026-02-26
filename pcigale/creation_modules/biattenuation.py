@@ -142,7 +142,7 @@ class BiAttenuationLaw(CreationModule):
             attenuation_spectra = attenuated_luminosities - sed.luminosities
             # We integrate the amount of luminosity attenuated (-1 because the
             # spectrum is negative).
-            attenuation_total_gal = -1 * np.trapz(attenuation_spectra[~mask_agn_contrib,:imax].sum(axis=0), wavelength[:imax])
+            attenuation_total_gal = -1 * np.trapezoid(attenuation_spectra[~mask_agn_contrib,:imax].sum(axis=0), wavelength[:imax])
             for contrib, attenuation_spectrum in zip(sed.contribution_names, attenuation_spectra):
                 sed.add_contribution("attenuation." + contrib, wavelength,
                                      attenuation_spectrum)
@@ -152,7 +152,7 @@ class BiAttenuationLaw(CreationModule):
             gal_emission = sed.luminosities[~mask_agn_contrib,:imax].sum(axis=0)
             nonagn_luminosities = gal_emission * 10**(e_bv * attenuation_curve[0,:imax] / -2.5)
             agn_luminosities = sed.luminosities[mask_agn_contrib,:imax].sum(axis=0) * 10**((e_bv + e_bv_agn) * attenuation_curve[0,:imax] / -2.5)
-            attenuation_total_gal = -np.trapz(nonagn_luminosities - gal_emission, wavelength[:imax])
+            attenuation_total_gal = -np.trapezoid(nonagn_luminosities - gal_emission, wavelength[:imax])
             attenuation_total_total2 = -sed.luminosity
             attenuation_total_total2[:imax] += nonagn_luminosities + agn_luminosities
             mask_negative = attenuation_total_total2 < -sed.luminosity

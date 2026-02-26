@@ -32,13 +32,13 @@ class ActivateBol(CreationModule):
         wave_mask = wavelength > 91.1753
         agn_noTOR_mask = np.array(['activate' in name and 'Torus' not in name for name in sed.contribution_names])
         BBB_luminosity = sed.luminosities[agn_noTOR_mask,:].sum(axis=0)
-        LbolBBB = np.trapz(y=BBB_luminosity[wave_mask], x=wavelength[wave_mask])
+        LbolBBB = np.trapezoid(y=BBB_luminosity[wave_mask], x=wavelength[wave_mask])
         sed.add_info('agn.lumBolBBB', LbolBBB, True)
 
         # Compute bolometric torus luminosity
         agn_TOR_mask = np.array(['activate' in name and 'Torus' in name for name in sed.contribution_names])
         TOR_luminosity = sed.luminosities[agn_TOR_mask,:].sum(axis=0)
-        LbolTOR = np.trapz(y=TOR_luminosity, x=wavelength)
+        LbolTOR = np.trapezoid(y=TOR_luminosity, x=wavelength)
         sed.add_info('agn.lumBolTOR', LbolTOR, True)
 
         # compute ratio of TOR to BBB
@@ -46,16 +46,16 @@ class ActivateBol(CreationModule):
 
         # Compute AGN fraction with this luminosity
         gal_mask = np.array(['activate' not in name for name in sed.contribution_names])
-        LbolGAL = np.trapz(sed.luminosities[gal_mask,:].sum(axis=0), x=wavelength)
+        LbolGAL = np.trapezoid(sed.luminosities[gal_mask,:].sum(axis=0), x=wavelength)
         sed.add_info('agn.fracAGNTOR', LbolTOR / (LbolTOR + LbolGAL), False)
 
         # AGN fraction as defined in Dale+2014:
         # the luminosity fraction over 5-20 micron
         mask_wave_range_Dale = np.logical_and(wavelength >= 5000, wavelength <= 20000)
-        LDaleAGN = np.trapz(
+        LDaleAGN = np.trapezoid(
             sed.luminosities[~gal_mask,:][:,mask_wave_range_Dale].sum(axis=0),
             x=wavelength[mask_wave_range_Dale])
-        LDaleGal = np.trapz(
+        LDaleGal = np.trapezoid(
             sed.luminosities[gal_mask,:][:,mask_wave_range_Dale].sum(axis=0),
             x=wavelength[mask_wave_range_Dale])
         sed.add_info('agn.fracAGNDale', LDaleAGN / (LDaleAGN + LDaleGal), False)
