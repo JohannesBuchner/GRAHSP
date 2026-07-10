@@ -1,3 +1,8 @@
+"""
+Create fiducial Gaussian filter curves for SPHEREx.
+
+Written by Raphael Shirley, Johannes Buchner.
+"""
 import matplotlib.pyplot as plt
 from astropy.table import Table
 import numpy as np
